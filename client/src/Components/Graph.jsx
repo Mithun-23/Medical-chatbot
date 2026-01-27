@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
+import { axiosClient } from "../axios";
 
 const SessionSentimentsGraph = () => {
     const [data, setData] = useState([]);
@@ -8,17 +9,16 @@ const SessionSentimentsGraph = () => {
 
     useEffect(() => {
         const sessionId = localStorage.getItem('chatSessionId');
-        console.log(sessionId+"rog");
+        console.log(sessionId + "rog");
         if (!sessionId) {
             setError('No session ID found in local storage');
             setLoading(false);
             return;
         }
 
-        fetch(`https://apparent-wolf-obviously.ngrok-free.app/api/get-session-sentiments/${sessionId}`)
-            .then(response => response.json())
-            .then(responseData => {
-                const chartData = responseData.map(item => ({
+        axiosClient.get(`https://apparent-wolf-obviously.ngrok-free.app/api/get-session-sentiments/${sessionId}`)
+            .then(response => {
+                const chartData = response.data.map(item => ({
                     time: new Date(item.timestamp).toLocaleTimeString(),
                     stressPercentageAnalysis: item.percentage
                 }));
@@ -26,7 +26,7 @@ const SessionSentimentsGraph = () => {
                 setLoading(false);
             })
             .catch(err => {
-                setError('Failed to fetch data',err);
+                setError('Failed to fetch data', err);
                 setLoading(false);
             });
     }, []);

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useContext } from "react";
 import { ThemeContext } from "./ThemeContext";
+import ActionButton from "./ActionButton";
 
 const TypingEffect = ({ text }) => {
   const [displayedText, setDisplayedText] = useState("");
@@ -26,7 +27,7 @@ const TypingEffect = ({ text }) => {
 };
 
 const UserAvatar = ({ initial }) => (
-  <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold shadow-md">
+  <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold shadow-md">
     {initial}
   </div>
 );
@@ -34,7 +35,7 @@ const UserAvatar = ({ initial }) => (
 const BotAvatar = ({ isDarkMode, emotion }) => {
   // Use emotional state to modify bot avatar
   const getEmotionColor = () => {
-    switch(emotion) {
+    switch (emotion) {
       case 'Happy':
         return 'from-yellow-400 to-orange-500';
       case 'Sad':
@@ -61,7 +62,7 @@ const BotAvatar = ({ isDarkMode, emotion }) => {
 
 const EmotionBadge = ({ emotion }) => {
   const getEmotionColor = () => {
-    switch(emotion) {
+    switch (emotion) {
       case 'Happy':
         return 'bg-yellow-100 text-yellow-800 border-yellow-300';
       case 'Sad':
@@ -92,28 +93,39 @@ const MessageBubble = ({ message, userInitial, isDarkMode, isLatestBotMessage, s
   if (!message || !message.sender || !message.text) return null;
 
   return (
-    <div className={`flex ${message.sender === "user" ? "justify-end" : "justify-start"} mb-4`}>
-      {message.sender === "bot" && <BotAvatar isDarkMode={isDarkMode} emotion={emotion} />}
+    <div className={`flex flex-col ${message.sender === "user" ? "items-end" : "items-start"} mb-4`}>
+      <div className={`flex ${message.sender === "user" ? "justify-end" : "justify-start"} w-full`}>
+        {message.sender === "bot" && <BotAvatar isDarkMode={isDarkMode} emotion={emotion} />}
 
-      <div
-        className={`max-w-[80%] rounded-lg p-3 mx-2 ${message.sender === "user"
-            ? "bg-gray-600 text-white"
+        <div
+          className={`max-w-[80%] rounded-lg p-3 mx-2 ${message.sender === "user"
+            ? "bg-blue-600 text-white"
             : isDarkMode
-              ? "bg-gray-900 text-white"
-              : "bg-white text-gray-900"
-          }`}
-      >
-        <p className="text-sm whitespace-pre-wrap">
-          {message.sender === "bot" && shouldShowTypingEffect ? (
-            <TypingEffect text={message.text} />
-          ) : (
-            message.text
-          )}
-          {message.sender === "bot" && <EmotionBadge emotion={emotion} />}
-        </p>
+              ? "bg-gray-800 text-white"
+              : "bg-gray-100 text-gray-900"
+            }`}
+        >
+          <p className="text-sm whitespace-pre-wrap">
+            {message.sender === "bot" && shouldShowTypingEffect ? (
+              <TypingEffect text={message.text} />
+            ) : (
+              message.text
+            )}
+            {message.sender === "bot" && <EmotionBadge emotion={emotion} />}
+          </p>
+        </div>
+
+        {message.sender === "user" && <UserAvatar initial={userInitial} />}
       </div>
 
-      {message.sender === "user" && <UserAvatar initial={userInitial} />}
+      {/* Render action buttons for bot messages */}
+      {message.sender === "bot" && message.actions && message.actions.length > 0 && (
+        <div className="flex flex-wrap gap-2 mt-3 ml-14">
+          {message.actions.map((action, actionIndex) => (
+            <ActionButton key={actionIndex} action={action} />
+          ))}
+        </div>
+      )}
     </div>
   );
 };
@@ -143,18 +155,18 @@ export default function ChatMessages({ messages, isLoading, error, onEmotionChan
 
   useEffect(() => {
     // Set up emotion fetching
-    emotionIntervalRef.current = setInterval(() => {
-      fetch('https://apparent-wolf-obviously.ngrok-free.app/emotion')
-        .then(response => response.json())
-        .then(data => {
-          setEmotion(data.emotion);
-          // Pass the emotion up to the parent component
-          if (onEmotionChange) {
-            onEmotionChange(data.emotion);
-          }
-        })
-        .catch(err => console.error('Error fetching emotion:', err));
-    }, 1000);
+    // emotionIntervalRef.current = setInterval(() => {
+    //   fetch('https://apparent-wolf-obviously.ngrok-free.app/emotion')
+    //     .then(response => response.json())
+    //     .then(data => {
+    //       setEmotion(data.emotion);
+    //       // Pass the emotion up to the parent component
+    //       if (onEmotionChange) {
+    //         onEmotionChange(data.emotion);
+    //       }
+    //     })
+    //     .catch(err => console.error('Error fetching emotion:', err));
+    // }, 1000);
 
     return () => {
       if (emotionIntervalRef.current) {
@@ -195,38 +207,6 @@ export default function ChatMessages({ messages, isLoading, error, onEmotionChan
 
   return (
     <div className="flex-1 overflow-y-auto custom-scrollbar italic">
-      <div className="flex-1/2 p">
-        <div style={{
-          position: 'fixed',
-          top: '55px',
-          right: '10px',
-          width: '300px',
-          height: '200px',
-          zIndex: '1000',
-          boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)',
-          borderRadius: '8px',
-          padding: '10px'
-        }}>
-          <img
-            src="https://apparent-wolf-obviously.ngrok-free.app/video_feed"
-            alt="Video Feed"
-            style={{ width: '100%', height: '100%', borderRadius: '8px' }}
-          />
-          <div style={{
-            position: 'absolute',
-            bottom: '15px',
-            right: '15px',
-            padding: '4px 8px',
-            backgroundColor: 'rgba(0, 0, 0, 0.6)',
-            color: 'white',
-            borderRadius: '4px',
-            fontSize: '12px'
-          }}>
-            {emotion}
-          </div>
-        </div>
-      </div>
-
       <div className="max-w-3xl mx-auto space-y-4 p-4">
         {messages.length > 0 ? (
           messages.map((message, index) => (
@@ -243,8 +223,7 @@ export default function ChatMessages({ messages, isLoading, error, onEmotionChan
           <div className="flex justify-start mb-4">
             <BotAvatar isDarkMode={isDarkMode} emotion={emotion} />
             <div
-              className={`max-w-[80%] rounded-lg p-3 mx-2 ${isDarkMode ? "bg-gray-900 text-white" : "bg-white text-gray-900"
-                }`}
+              className={`max-w-[80%] rounded-lg p-3 mx-2 ${isDarkMode ? "bg-gray-800 text-white" : "bg-gray-100 text-gray-900"}`}
             >
               <p className="text-sm whitespace-pre-wrap">
                 <TypingEffect text={`Hi ${name}, I am Dr.Chat 😊`} />
@@ -257,12 +236,11 @@ export default function ChatMessages({ messages, isLoading, error, onEmotionChan
         {isLoading && (
           <div className="flex justify-start">
             <BotAvatar isDarkMode={isDarkMode} emotion={emotion} />
-            <div className={`rounded-lg p-3 shadow-md ml-2 ${isDarkMode ? "bg-gray-800" : "bg-white"
-              }`}>
+            <div className={`rounded-lg p-3 shadow-md ml-2 ${isDarkMode ? "bg-gray-800" : "bg-gray-100"}`}>
               <div className="flex space-x-2">
-                <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce"></div>
-                <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce delay-100"></div>
-                <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce delay-200"></div>
+                <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"></div>
+                <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce delay-100"></div>
+                <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce delay-200"></div>
               </div>
             </div>
           </div>
@@ -270,7 +248,7 @@ export default function ChatMessages({ messages, isLoading, error, onEmotionChan
 
         {error && (
           <div className="flex justify-center">
-            <div className="bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-lg p-3 text-sm">
+            <div className={`rounded-lg p-3 text-sm ${isDarkMode ? "bg-red-900/30 text-red-400" : "bg-red-100 text-red-600"}`}>
               {error}
               <button
                 className="ml-2 underline"

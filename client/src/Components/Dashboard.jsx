@@ -1,8 +1,8 @@
 import React, { useContext, useEffect, useState } from "react";
-import axios from "axios";
+import { axiosClient } from "../axios";
 import {
   LineChart,
-  AreaChart,Area,
+  AreaChart, Area,
   Line,
   XAxis,
   YAxis,
@@ -13,7 +13,6 @@ import {
   BarChart,
   Bar
 } from "recharts";
-import Sidebar from "./Sidebar";
 import { ThemeContext } from "./ThemeContext";
 import StressGraph from "./StressGraph";
 
@@ -22,7 +21,7 @@ export const HeartRateComponent = () => {
   const [heartRateZones, setHeartRateZones] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const {isDarkMode} = useContext(ThemeContext);
+  const { isDarkMode } = useContext(ThemeContext);
   const timeframe = "1d";
 
   useEffect(() => {
@@ -38,7 +37,7 @@ export const HeartRateComponent = () => {
         const headers = { Authorization: `Bearer ${token}` };
 
 
-        const heartRateResponse = await axios.get(
+        const heartRateResponse = await axiosClient.get(
           `https://api.fitbit.com/1/user/-/activities/heart/date/today/${timeframe}.json`,
           { headers }
         );
@@ -60,7 +59,7 @@ export const HeartRateComponent = () => {
 
 
         try {
-          const intradayResponse = await axios.get(
+          const intradayResponse = await axiosClient.get(
             `https://api.fitbit.com/1/user/-/activities/heart/date/today/1d/1min.json`,
             { headers }
           );
@@ -95,7 +94,7 @@ export const HeartRateComponent = () => {
   if (loading) {
     return (
       <div className={`dashboard-container ${isDarkMode ? "bg-gray-900 text-white" : "bg-gray-100 text-black"}`}>
-        <h2 className={` ${isDarkMode ? "text-white": "text-gray-900"} text-white text-xl font-semibold mb-4`}>Heart Rate Data</h2>
+        <h2 className={` ${isDarkMode ? "text-white" : "text-gray-900"} text-white text-xl font-semibold mb-4`}>Heart Rate Data</h2>
         <div className={`${isDarkMode ? "text-white" : "text-gray-900"}`}>Loading heart rate data...</div>
       </div>
     );
@@ -181,7 +180,7 @@ export const HeartRateComponent = () => {
 export const StepsComponent = () => {
   const [stepsData, setStepsData] = useState([]);
   const timeframe = "1w";
-  const {isDarkMode} = useContext(ThemeContext);
+  const { isDarkMode } = useContext(ThemeContext);
 
   useEffect(() => {
     const fetchStepsData = async () => {
@@ -196,14 +195,14 @@ export const StepsComponent = () => {
         const headers = { Authorization: `Bearer ${token}` };
 
 
-        const stepsResponse = await axios.get(
+        const stepsResponse = await axiosClient.get(
           `https://api.fitbit.com/1/user/-/activities/steps/date/today/${timeframe}.json`,
           { headers }
         );
 
         console.log("Steps Data:", stepsResponse.data);
-      //   const stepsDict = createFitbitDataDictionary(stepsResponse.data);
-      // console.log("Steps Dictionary:", stepsDict);
+        //   const stepsDict = createFitbitDataDictionary(stepsResponse.data);
+        // console.log("Steps Dictionary:", stepsDict);
 
         const formattedStepsData = stepsResponse.data["activities-steps"].map((item) => ({
           date: item.dateTime,
@@ -242,7 +241,7 @@ const SleepComponent = () => {
   //const [sleepData, setSleepData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const {isDarkMode} = useContext(ThemeContext);
+  const { isDarkMode } = useContext(ThemeContext);
   const sleepData = [
     {
       date: "2025-03-04",
@@ -321,14 +320,14 @@ const SleepComponent = () => {
         const formattedSevenDaysAgo = sevenDaysAgo.toISOString().split('T')[0];
 
 
-        const sleepRangeResponse = await axios.get(
+        const sleepRangeResponse = await axiosClient.get(
           `https://api.fitbit.com/1.2/user/-/sleep/date/${formattedSevenDaysAgo}/${today}.json`,
           { headers }
         );
         const sleepData = sleepRangeResponse.data;
 
         // Send data to your backend
-        await axios.post('http://localhost:/send-sleep-data', { sleepData });
+        await axiosClient.post('http://localhost:/send-sleep-data', { sleepData });
 
         // const sleepDict = createFitbitDataDictionary(sleepRangeResponse.data);
         // console.log("Sleep Dictionary:", sleepDict);
@@ -408,7 +407,7 @@ export const ActivityComponent = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const timeframe = "1w";
-  const {isDarkMode} = useContext(ThemeContext);
+  const { isDarkMode } = useContext(ThemeContext);
 
   useEffect(() => {
     const fetchActivityData = async () => {
@@ -423,7 +422,7 @@ export const ActivityComponent = () => {
         const headers = { Authorization: `Bearer ${token}` };
 
 
-        const caloriesResponse = await axios.get(
+        const caloriesResponse = await axiosClient.get(
           `https://api.fitbit.com/1/user/-/activities/tracker/calories/date/today/${timeframe}.json`,
           { headers }
         );
@@ -431,7 +430,7 @@ export const ActivityComponent = () => {
         console.log("Tracker Calories Data:", caloriesResponse.data);
 
 
-        const distanceResponse = await axios.get(
+        const distanceResponse = await axiosClient.get(
           `https://api.fitbit.com/1/user/-/activities/tracker/distance/date/today/${timeframe}.json`,
           { headers }
         );
@@ -521,41 +520,37 @@ export const ActivityComponent = () => {
 };
 
 const Dashboard = () => {
-  const {isDarkMode} = useContext(ThemeContext);
+  const { isDarkMode } = useContext(ThemeContext);
   return (
-    <div className={`flex italic ${isDarkMode ? "text-white" : "text-gray-900"} min-h-screen  overflow-y-auto custom-scrollbar`}>
+    <div className={`italic ${isDarkMode ? "text-white" : "text-gray-900"} min-h-screen overflow-y-auto custom-scrollbar`}>
+      <div className="p-6">
+        <h1 className={` text-2xl font-bold mb-6 ${isDarkMode ? "text-white" : "text-gray-900"}`}>Fitness Dashboard</h1>
 
-    <Sidebar />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
+          <div className={` ${isDarkMode ? "bg-gray-900" : "bg-gray-100"} rounded-lg p-4 shadow-lg`}>
+            <HeartRateComponent />
+          </div>
 
-    <div className="flex-1 pl-20 p-6 ">
-      <h1 className={` text-2xl font-bold mb-6 ${isDarkMode ? "text-white" : "text-gray-900"}`}>Fitness Dashboard</h1>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-        <div className={` ${isDarkMode ? "bg-gray-900" : "bg-gray-100"} rounded-lg p-4 shadow-lg`}>
-          <HeartRateComponent />
-        </div>
-
-        <div className={`${isDarkMode ? "bg-gray-900" : "bg-gray-100"} rounded-lg p-4 shadow-lg`}>
-          <StepsComponent />
-        </div>
+          <div className={`${isDarkMode ? "bg-gray-900" : "bg-gray-100"} rounded-lg p-4 shadow-lg`}>
+            <StepsComponent />
+          </div>
 
 
-        <div className={`${isDarkMode ? "bg-gray-900" : "bg-gray-100"} rounded-lg p-4 shadow-lg`}>
-          <SleepComponent />
-        </div>
+          <div className={`${isDarkMode ? "bg-gray-900" : "bg-gray-100"} rounded-lg p-4 shadow-lg`}>
+            <SleepComponent />
+          </div>
 
 
-        <div className={`${isDarkMode ? "bg-gray-900" : "bg-gray-100"} rounded-lg p-4 shadow-lg`}>
-          <ActivityComponent />
-        </div>
-        <div className={`${isDarkMode ? "bg-gray-900" : "bg-gray-100"} rounded-lg p-4 shadow-lg`}>
-      <  StressGraph />
+          <div className={`${isDarkMode ? "bg-gray-900" : "bg-gray-100"} rounded-lg p-4 shadow-lg`}>
+            <ActivityComponent />
+          </div>
+          <div className={`${isDarkMode ? "bg-gray-900" : "bg-gray-100"} rounded-lg p-4 shadow-lg`}>
+            <  StressGraph />
+          </div>
         </div>
       </div>
     </div>
-  </div>
 
   );
 };

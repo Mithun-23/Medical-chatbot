@@ -5,8 +5,7 @@ import { db } from "./Firebase";
 import { auth } from "./Firebase";
 import { FaEdit, FaSave, FaPlus } from "react-icons/fa";
 import { ThemeContext } from "./ThemeContext";
-import axios from "axios";
-import Sidebar from "./Sidebar";
+import { axiosClient } from "../axios";
 import { X, Trash2, Calendar } from "lucide-react";
 import ChatHistory from "./ChatHistory";
 
@@ -60,14 +59,8 @@ const Profile = () => {
     const fetchChatHistory = async (sessionId) => {
       try {
         const userId = localStorage.getItem("Email"); // Get user email
-        const response = await fetch(`https://medical-chatbot-02.onrender.com/api/sessions?userId=${encodeURIComponent(userId)}`);
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch chat history");
-        }
-
-        const data = await response.json();
-        setChatHistory(data);
+        const response = await axiosClient.get(`/api/sessions?userId=${encodeURIComponent(userId)}`);
+        setChatHistory(response.data);
       } catch (error) {
         console.error("Error fetching chat history:", error);
       } finally {
@@ -86,7 +79,7 @@ const Profile = () => {
       const token = await getIdToken(currentUser);
       const userEmail = encodeURIComponent(currentUser.email);
 
-      const response = await axios.get(`https://medical-chatbot-02.onrender.com/chat/active-days?userId=${userEmail}`, {
+      const response = await axiosClient.get(`/chat/active-days?userId=${userEmail}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -118,17 +111,15 @@ const Profile = () => {
   }, []);
 
 
- 
+
 
   const loadChat = async (selectedSessionId) => {
     try {
       setIsLoading(true);
       const userId = localStorage.getItem("Email");
 
-      const response = await fetch(`https://medical-chatbot-02.onrender.com/api/chat/${selectedSessionId}?userId=${encodeURIComponent(userId)}`);
-      if (!response.ok) throw new Error("Failed to fetch chat history");
-
-      const chatData = await response.json();
+      const response = await axiosClient.get(`/api/chat/${selectedSessionId}?userId=${encodeURIComponent(userId)}`);
+      const chatData = response.data;
 
       // Update the session ID
       setSessionId(selectedSessionId);
@@ -176,23 +167,13 @@ const Profile = () => {
     }
 
     try {
-      const response = await fetch("https://medical-chatbot-02.onrender.com/api/analyze", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          userId,
-          sessionId,
-          messages: [{ sender: "user", text: "Hello!" }] // Sample message
-        })
+      const response = await axiosClient.post("/api/analyze", {
+        userId,
+        sessionId,
+        messages: [{ sender: "user", text: "Hello!" }] // Sample message
       });
 
-      if (!response.ok) {
-        throw new Error(`API Error: ${response.status}`);
-      }
-
-      const data = await response.json();
+      const data = response.data;
 
       if (!data?.chatReport?.sentiment) {
         console.warn("⚠️ No sentiment data received.");
@@ -223,7 +204,7 @@ const Profile = () => {
         const userRef = doc(db, "users", auth.currentUser.uid);
         await setDoc(userRef, { phone, dob }, { merge: true });
         console.log(phone)
-        localStorage.setItem("phone",phone)
+        localStorage.setItem("phone", phone)
         // Refresh user data
         onAuthStateChanged(auth, (updatedUser) => {
           if (updatedUser) {
@@ -243,10 +224,8 @@ const Profile = () => {
 
 
   return (
-    <div className={`flex min-h-screen  ${isDarkMode ? "bg-gray-900 text-white" : "bg-gray-100 text-black"}`}>
-      <Sidebar />
-
-      <div className="flex-1 px-25 pt-10 mb-5 flex flex-col">
+    <div className={`min-h-screen ${isDarkMode ? "bg-gray-900 text-white" : "bg-gray-100 text-black"}`}>
+      <div className="px-10 pt-10 mb-5 flex flex-col">
         <div className="flex flex-col items-start mb-6">
           {user?.photoURL && (
             <img
@@ -381,7 +360,7 @@ const Profile = () => {
                   <div
                     key={chat.id}
                     onClick={() => loadChat(chat.id)}
-                    className={`p-4 border-b cursor-pointer truncate transition-all duration-300 ${isDarkMode ? "border-gray-700 hover:bg-gray-800" : "border-gray-100 hover:bg-gray-50"} ${currentSessionId === chat.id ? "bg-blue-900/20 text-blue-300 dark:bg-blue-700/40" : ""}`}
+                    className={`p-4 border-b cursor-pointer truncate transition-all duration-300 ${isDarkMode ? "border-gray-700 hover:bg-gray-800" : "border-gray-100 hover:bg-gray-50"} ${currentSessionId === chat.id ? (isDarkMode ? "bg-blue-700/40 text-blue-300" : "bg-blue-100 text-blue-700") : ""}`}
                   >
                     <div className="flex justify-between items-start mb-1">
                       <h3 className={`font-medium text-sm truncate transition-all duration-300 ${isDarkMode ? "text-gray-300" : "text-gray-800"}`}>
