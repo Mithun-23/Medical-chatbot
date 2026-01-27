@@ -1,0 +1,79 @@
+:root {
+  --bg-color: #ffffff;
+  --text-color: #000000;
+  --border-color: #e5e7eb;
+  --hover-bg-color: #f3f4f6;
+  --icon-color: #6b7280; /* Add your font here */
+}
+
+:root.dark {
+  --bg-color: #1f2937;
+  --text-color: #ffffff;
+  --border-color: #374151;
+  --hover-bg-color: #4b5563;
+  --icon-color: #9ca3af;
+}
+
+body {
+  background-color: var(--bg-color);
+  color: var(--text-color);
+}
+
+.border {
+  border-color: var(--border-color);
+}
+
+.hover-bg {
+  transition: background-color 0.3s;
+}
+
+.hover-bg:hover {
+  background-color: var(--hover-bg-color);
+}
+
+.icon {
+  color: var(--icon-color);
+}
+
+.flex-1 {
+  flex: 1;
+}
+
+.overflow-y-auto {
+  overflow-y: auto;
+}
+
+/* Hide scrollbar for Chrome, Safari, and Opera */
+.custom-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Hide scrollbar for IE, Edge, and Firefox */
+.custom-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.sidebar {
+  height: 100vh; /* Full viewport height */
+  overflow-y: auto; /* Enables scrolling */
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.sidebar::-webkit-scrollbar {
+  display: none; /* Chrome, Safari */
+}
+
+.scrollbar-hidden::-webkit-scrollbar {
+  display: none; /* For Chrome, Safari, and Opera */
+}
+
+.scrollbar-hidden {
+  -ms-overflow-style: none; /* For IE and Edge */
+  scrollbar-width: none; /* For Firefox */
+/* Apply font to all elements with tracking-tighter class */
+}
+.tracking-tighter {
+  font-family: var(--font-family-tracking-tighter);
+}

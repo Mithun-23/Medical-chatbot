@@ -1,0 +1,7 @@
+server/.env
+server/service-account.json
+.env
+*.key
+*.pem
+*.crt
+config.json
