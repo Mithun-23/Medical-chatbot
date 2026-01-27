@@ -1,7 +1,29 @@
+# --- Environment & Secrets ---
+.env
 server/.env
 server/service-account.json
-.env
+config.json
 *.key
 *.pem
 *.crt
-config.json
+
+# --- Node.js ---
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# --- Python ---
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# --- OS / Editor ---
+.DS_Store
+.vscode/
+.idea/
+
+# --- Build / Cache ---
+dist/
+build/

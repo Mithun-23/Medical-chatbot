@@ -6,8 +6,8 @@ from dotenv import load_dotenv
 import os
 from deep_translator import GoogleTranslator
 from langdetect import detect
-from langchain.memory import ConversationBufferMemory
-from langchain.prompts import PromptTemplate
+from langchain_classic.memory import ConversationBufferMemory
+from langchain_classic.prompts import PromptTemplate
 from transformers import pipeline
 import torch
 import traceback
@@ -341,7 +341,7 @@ def chatbot():
 """
 
 ngrok.set_auth_token("2a1iGE4Q5SDAF4mhdAVXeNptwJd_2GBcW2ACMaj2JoAJy8Gtt")
-listener = ngrok.forward("127.0.0.1:5000", authtoken_from_env=True, domain="apparent-wolf-obviously.ngrok-free.app")
+listener = ngrok.forward("127.0.0.1:5001", authtoken_from_env=True, domain="apparent-wolf-obviously.ngrok-free.app")
 
 @app.route('/chat', methods=['POST'])
 def chat_bot():
@@ -1013,6 +1013,6 @@ def get_sentiment_history():
         return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
-    public_url = ngrok.connect(5000)
+    public_url = ngrok.connect(5001)
     print(f"Public URL: {public_url}")
-    app.run(host="0.0.0.0", port=5000)
+    app.run(host="0.0.0.0", port=5001)
