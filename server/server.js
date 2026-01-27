@@ -5,7 +5,7 @@ const bodyParser = require('body-parser');
 const admin = require('firebase-admin');
 // Import Routes
 const chatRoutes = require('./routes/chatRoutes');
-const SaveSummary= require('./routes/saveSummary');
+const SaveSummary = require('./routes/saveSummary');
 const Report = require('./routes/report');
 require('dotenv').config();
 
@@ -13,11 +13,6 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 app.use(express.json());
-
-// Protected Routes (Require Authentication)
-app.use('/chat', chatRoutes);
-app.use('/api', SaveSummary);
-app.use('/api',chatRoutes);
 
 // Initialize Firebase Admin
 const serviceAccount = require('./service-account.json'); // Update the path
@@ -52,19 +47,19 @@ const verifyToken = async (req, res, next) => {
 };
 
 app.use('/api', chatRoutes);
-app.use('/api',SaveSummary);
-app.use('/api',Report);
+app.use('/api', SaveSummary);
+app.use('/api', Report);
 
 
 mongoose.connect(process.env.MONGO_URI, {
     useNewUrlParser: true,
     useUnifiedTopology: true
 })
-.then(() => console.log('✅ MongoDB connected'))
-.catch(err => {
-    console.error('❌ MongoDB connection error:', err);
-    process.exit(1);
-});
+    .then(() => console.log('✅ MongoDB connected'))
+    .catch(err => {
+        console.error('❌ MongoDB connection error:', err);
+        process.exit(1);
+    });
 
 app.use((err, req, res, next) => {
     console.error("❌ Error:", err.stack);

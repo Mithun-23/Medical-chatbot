@@ -6,12 +6,15 @@ const Summary = require("../models/SummarizedHistory");
 
 const router = express.Router();
 
-
+router.post('/chat', async (req, res) => {
+    const chatResponse = await axios.post('http://localhost:5000/api/chat', req.body);
+    return res.status(200).json(chatResponse.data);
+});
 
 router.post("/chatbot", async (req, res) => {
     try {
-        const { userId, message, sessionId, title,emotion}= req.body;
-      if (!userId || !message || !sessionId) {
+        const { userId, message, sessionId, title, emotion } = req.body;
+        if (!userId || !message || !sessionId) {
             return res.status(400).json({ error: "Missing required fields" });
         }
 
@@ -44,8 +47,8 @@ router.post("/chatbot", async (req, res) => {
         const modelPayload = {
             message,
             user_id: userId,
-            sessionId:sessionId,
-            emotion:emotion,
+            sessionId: sessionId,
+            emotion: emotion,
             history_summary: latestSummary ? latestSummary.summarizedHistory : ""
         };
 
@@ -54,7 +57,7 @@ router.post("/chatbot", async (req, res) => {
 
         let modelResponse;
         try {
-            modelResponse = await axios.post("https://apparent-wolf-obviously.ngrok-free.app/api/chat", modelPayload);
+            modelResponse = await axios.post("http://localhost:5000/api/chat", modelPayload);
         } catch (modelError) {
             console.error("Model API Error:", modelError.response?.data || modelError.message);
             return res.status(500).json({ error: "Failed to process chatbot response" });
@@ -200,32 +203,32 @@ router.post("/saveSummary", async (req, res) => {
 
 router.get("/active-days", async (req, res) => {
     try {
-      const userEmail = req.query.userId; // Extract user email
+        const userEmail = req.query.userId; // Extract user email
 
-      console.log("🔍 Received userId:", userEmail); // Debugging
+        console.log("🔍 Received userId:", userEmail); // Debugging
 
-      if (!userEmail) {
-        return res.status(400).json({ error: "User email is required" });
-      }
+        if (!userEmail) {
+            return res.status(400).json({ error: "User email is required" });
+        }
 
-      // Find sessions based on email
-      const sessions = await Session.find({ userId: userEmail }).select("createdAt");
+        // Find sessions based on email
+        const sessions = await Session.find({ userId: userEmail }).select("createdAt");
 
-      if (!sessions.length) {
-        return res.json({ activeDays: [], totalDays: 0 });
-      }
+        if (!sessions.length) {
+            return res.json({ activeDays: [], totalDays: 0 });
+        }
 
-      // Extract unique days
-      const activeDaysSet = new Set(
-        sessions.map((session) => session.createdAt.toISOString().split("T")[0])
-      );
+        // Extract unique days
+        const activeDaysSet = new Set(
+            sessions.map((session) => session.createdAt.toISOString().split("T")[0])
+        );
 
-      return res.json({ activeDays: Array.from(activeDaysSet), totalDays: activeDaysSet.size });
+        return res.json({ activeDays: Array.from(activeDaysSet), totalDays: activeDaysSet.size });
     } catch (error) {
-      console.error("❌ Error fetching active days:", error);
-      res.status(500).json({ error: "Server error" });
+        console.error("❌ Error fetching active days:", error);
+        res.status(500).json({ error: "Server error" });
     }
-  });
+});
 
 
 module.exports = router;

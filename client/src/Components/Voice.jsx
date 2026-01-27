@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useContext } from "react";
 import { useNavigate } from 'react-router-dom';
 import { RiMic2Line } from "react-icons/ri";
-import Sidebar from "./Sidebar";
 import { ThemeContext } from "./ThemeContext";
+import { axiosClient } from "../axios";
 
 export default function Voice() {
   const navigate = useNavigate();
@@ -67,21 +67,11 @@ export default function Voice() {
   const handleSendMessage = async (textar) => {
     console.log("Textar:", textar);
     try {
-      const response = await fetch('https://apparent-wolf-obviously.ngrok-free.app/api/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: textar
-        })
+      const response = await axiosClient.post('/api/chat', {
+        message: textar
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
+      const data = response.data;
       console.log(data.response);
 
       setApiResponse(data.response);
@@ -106,7 +96,7 @@ export default function Voice() {
 
       // Configure and play speech
       const speech = configureSpeech(data.response, finalSentiment);
-      
+
       // Cancel any ongoing speech and start speaking
       window.speechSynthesis.cancel();
       window.speechSynthesis.speak(speech);
@@ -139,10 +129,10 @@ export default function Voice() {
 
     // Check for question patterns
     if (textLower.includes("?") ||
-        textLower.includes("என்ன") ||
-        textLower.includes("எப்படி") ||
-        textLower.includes("ஏன்") ||
-        textLower.includes("எங்கே")) {
+      textLower.includes("என்ன") ||
+      textLower.includes("எப்படி") ||
+      textLower.includes("ஏன்") ||
+      textLower.includes("எங்கே")) {
       return "curious";
     }
 
@@ -219,13 +209,8 @@ export default function Voice() {
   };
 
   return (
-    <div className={`min-h-screen italic ${isDarkMode ? "bg-gray-900" : "bg-white"} ${isDarkMode ? "text-white" : "text-gray-900"} flex`}>
-
-      <aside className="w-64 h-screen flex-shrink-0">
-        <Sidebar />
-      </aside>
-
-      <div className="flex-1 flex flex-row">
+    <div className={`min-h-screen italic ${isDarkMode ? "bg-gray-900" : "bg-white"} ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+      <div className="flex flex-row">
         <div className="w-1/2 flex items-center justify-center">
           <div className="w-full max-w-md flex items-center justify-center">
             <iframe
@@ -282,16 +267,10 @@ export default function Voice() {
             >
               <RiMic2Line size={30} />
             </div>
-            <p className="mt-2 text-sm text-center text-gray-500 dark:text-gray-400">
+            <p className={`mt-2 text-sm text-center ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
               {isListening ? "Listening..." : "Click to speak"}
             </p>
           </div>
-          {text && (
-  <div className="mt-4 bg-gray-100 dark:bg-gray-800 p-4 rounded-lg shadow-md w-full max-w-md">
-    <h3 className="text-lg font-medium text-gray-700 dark:text-gray-300">Spoken Text:</h3>
-    <p className="text-sm text-gray-600 dark:text-gray-400">{text}</p>
-  </div>
-)}
           <div>
 
           </div>

@@ -2,22 +2,17 @@ import React from "react";
 import { X, Trash2, Calendar } from "lucide-react";
 import { RepeatIcon as ArrowRepeat } from "lucide-react";
 import { FaPlus } from "react-icons/fa";
-export default function ChatHistory({ chatHistory, loadChat, handleToggleChatHistory, isDarkMode, currentSessionId ,handleRefreshChat}) {
+import { axiosClient } from "../axios";
+export default function ChatHistory({ chatHistory, loadChat, handleToggleChatHistory, isDarkMode, currentSessionId, handleRefreshChat }) {
   const deleteChat = async (sessionId, e) => {
-    e.stopPropagation(); 
+    e.stopPropagation();
 
     if (window.confirm("Are you sure you want to delete this chat?")) {
       try {
         const userId = localStorage.getItem("Email");
-        const response = await fetch(`https://medical-chatbot-02.onrender.com/api/chat/${sessionId}`, {
-          method: "DELETE",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userId }),
+        await axiosClient.delete(`/api/chat/${sessionId}`, {
+          data: { userId },
         });
-
-        if (!response.ok) {
-          throw new Error("Failed to delete chat");
-        }
 
         window.location.reload(); // Refresh chat history
       } catch (error) {
@@ -38,20 +33,20 @@ export default function ChatHistory({ chatHistory, loadChat, handleToggleChatHis
         ${isDarkMode ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-gray-50"}`}>
         <h2 className="font-medium">Recent Chats</h2>
         <div className="pl-15">
-        <button
-          onClick={handleToggleChatHistory}
-          className={` rounded-full transition-colors duration-300
+          <button
+            onClick={handleToggleChatHistory}
+            className={` rounded-full transition-colors duration-300
           ${isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"}`}
-        >
-           <FaPlus size={12} color="gray" onClick={handleRefreshChat}/>
-        </button>
+          >
+            <FaPlus size={12} color="gray" onClick={handleRefreshChat} />
+          </button>
         </div>
         <button
           onClick={handleToggleChatHistory}
           className={`p-1 rounded-full transition-colors duration-300
           ${isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"}`}
         >
-          <X className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+          <X className={`w-4 h-4 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`} />
         </button>
       </div>
 
@@ -64,7 +59,7 @@ export default function ChatHistory({ chatHistory, loadChat, handleToggleChatHis
               onClick={() => loadChat(chat.id)}
               className={`p-3 border-b cursor-pointer truncate relative transition-colors duration-300
                 ${isDarkMode ? "border-gray-700 hover:bg-gray-800" : "border-gray-100 hover:bg-gray-50"}
-                ${currentSessionId === chat.id ? "bg-blue-900/20 text-blue-300 dark:bg-blue-700/40" : ""}`}
+                ${currentSessionId === chat.id ? (isDarkMode ? "bg-blue-700/40 text-blue-300" : "bg-blue-100 text-blue-700") : ""}`}
             >
               <div className="flex justify-between items-start mb-1">
                 <h3 className={`font-medium text-sm truncate transition-colors duration-300
@@ -76,7 +71,7 @@ export default function ChatHistory({ chatHistory, loadChat, handleToggleChatHis
                   className={`p-1 rounded-full absolute right-2 top-2 transition-colors duration-300
                   ${isDarkMode ? "hover:bg-red-900/40" : "hover:bg-red-100"}`}
                 >
-                  <Trash2 className="w-3 h-3 text-gray-400 hover:text-red-500 dark:hover:text-red-400" />
+                  <Trash2 className={`w-3 h-3 ${isDarkMode ? "text-gray-400 hover:text-red-400" : "text-gray-400 hover:text-red-500"}`} />
                 </button>
               </div>
               <div className={`flex items-center mt-1 text-xs transition-colors duration-300
@@ -99,5 +94,5 @@ export default function ChatHistory({ chatHistory, loadChat, handleToggleChatHis
         )}
       </div>
     </div>
-    );
+  );
 }

@@ -1,5 +1,4 @@
 import React, { useContext, useState } from 'react'
-import Sidebar from './Sidebar'
 import logo1 from '../assets/game1.png'
 import logo2 from '../assets/game2.png'
 import logo3 from '../assets/game3.png'
@@ -10,7 +9,7 @@ import { ThemeContext } from './ThemeContext'
 
 const GameSelector = () => {
   const [selectedGame, setSelectedGame] = useState(null);
-  const {isDarkMode} = useContext(ThemeContext);
+  const { isDarkMode } = useContext(ThemeContext);
 
   const games = [
     { id: 1, image: logo1, name: "Game 1", description: "Action-packed adventure", link: "https://my.spline.design/platformerrabbitcopy-40e708c7abbfe2d6c57b4b6af8db1fe5/" },
@@ -30,13 +29,9 @@ const GameSelector = () => {
   };
 
   return (
-    <div className="min-h-screen relative italic">
-      <div>
-        <Sidebar />
-      </div>
-
-      <div className="py-8  shadow-sm">
-        <h1 className={`text-center ${isDarkMode ? "text-white": "text-black"}  text-4xl font-bold`}>
+    <div className={`min-h-screen italic ${isDarkMode ? "bg-gray-900" : "bg-white"}`}>
+      <div className="py-8 shadow-sm">
+        <h1 className={`text-center ${isDarkMode ? "text-white" : "text-black"} text-4xl font-bold`}>
           Select The Game You Like
         </h1>
       </div>
@@ -46,7 +41,7 @@ const GameSelector = () => {
           {games.map((game) => (
             <div
               key={game.id}
-              className=" rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-shadow duration-300 transform hover:-translate-y-1 transition-transform duration-300 cursor-pointer"
+              className="rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-shadow duration-300 transform hover:-translate-y-1 cursor-pointer"
               onClick={() => handleGameClick(game)}
             >
               <div className="relative group">
@@ -55,7 +50,7 @@ const GameSelector = () => {
                   alt={game.name}
                   className="w-full h-64 object-cover transition-transform duration-300 group-hover:scale-105"
                 />
-                <div className="absolute inset-0  bg-opacity-0 group-hover:bg-opacity-60 transition-opacity duration-300 flex items-end">
+                <div className="absolute inset-0 bg-opacity-0 group-hover:bg-opacity-60 transition-opacity duration-300 flex items-end">
                   <div className="p-4 text-black opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                     <h3 className="text-xl font-semibold mb-1">{game.name}</h3>
                     <p className="text-sm">{game.description}</p>
@@ -68,7 +63,7 @@ const GameSelector = () => {
         </div>
       </div>
 
-     
+
       {selectedGame && (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
           <div className="relative bg-white rounded-lg w-full max-w-5xl h-5/6 flex flex-col">
@@ -95,7 +90,7 @@ const GameSelector = () => {
         </div>
       )}
     </div>
-  )
-}
+  );
+};
 
-export default GameSelector
+export default GameSelector;

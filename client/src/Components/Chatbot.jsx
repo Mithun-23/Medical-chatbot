@@ -2,18 +2,19 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from 'react-router-dom';
 import ChatMessages from "./ChatMessages";
 import ChatInput from "./ChatInput";
-import Sidebar from "./Sidebar";
 import ChatHistory from "./ChatHistory";
 import '../styles.css';
 import { v4 as uuidv4 } from "uuid";
 import { useContext } from "react";
 import { ThemeContext } from "./ThemeContext";
-import { TbReportAnalytics } from "react-icons/tb";
 import Report from './Report';
 import { GoGraph } from "react-icons/go";
+import { axiosClient } from "../axios";
+import LoginModal from "./LoginModal";
+import ActionButton from "./ActionButton";
 export default function Chatbot() {
   const navigate = useNavigate();
-  const {isDarkMode} = useContext(ThemeContext);
+  const { isDarkMode } = useContext(ThemeContext);
   const [inputValue, setInputValue] = useState("");
   const name = localStorage.getItem("Name") || "User";
   const [messages, setMessages] = useState([]);
@@ -32,6 +33,7 @@ export default function Chatbot() {
   const [cameraActive, setCameraActive] = useState(false);
   const [emotionData, setEmotionData] = useState(null);
   const [intervalId, setIntervalId] = useState(null);
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
   // Handler for emotion changes from ChatMessages
   const handleEmotionChange = (emotion) => {
@@ -44,7 +46,7 @@ export default function Chatbot() {
     const storedMessages = JSON.parse(localStorage.getItem("chatMessages"));
     if (storedMessages && storedMessages.length > 0) {
       setMessages(storedMessages);
-      
+
       setIsFirstMessageSent(true);
     } else {
       setMessages([]);
@@ -75,11 +77,8 @@ export default function Chatbot() {
     }
 
     try {
-      const response = await fetch(`https://medical-chatbot-02.onrender.com/api/sessions?userId=${encodeURIComponent(userId)}`);
-      if (!response.ok) {
-        throw new Error("Failed to fetch sessions");
-      }
-      const sessions = await response.json();
+      const response = await axiosClient.get(`/api/sessions?userId=${encodeURIComponent(userId)}`);
+      const sessions = response.data;
 
       const formattedSessions = sessions.map(session => ({
         id: session.id || session.sessionId,
@@ -100,8 +99,8 @@ export default function Chatbot() {
 
     const userId = localStorage.getItem("Email");
     if (!userId) {
-      setError("User not authenticated. Please log in again.");
-      navigate('/login');
+      setError("User not authenticated. Please log in.");
+      setShowLoginModal(true);
       return;
     }
 
@@ -112,7 +111,7 @@ export default function Chatbot() {
     }
     let messageText = inputValue;
     if (currentEmotion === "sad") {
-        messageText = "I am feeling sad";
+      messageText = "I am feeling sad";
     }
     const userMessage = { text: inputValue, sender: "user" };
     setMessages(prevMessages => [...prevMessages, userMessage]);
@@ -129,24 +128,20 @@ export default function Chatbot() {
         localStorage.setItem("chatSessionTitle", currentTitle);
       }
 
-      const response = await fetch("https://medical-chatbot-02.onrender.com/api/chatbot", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId,
-          message: messageText,
-          sessionId,
-          title: currentTitle,
-          emotion: currentEmotion // Include current emotion in the API request
-        }),
+      const response = await axiosClient.post("/api/chat", {
+        userId,
+        message: messageText,
+        sessionId,
+        title: currentTitle,
+        emotion: currentEmotion // Include current emotion in the API request
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      const botMessage = { text: data.response, sender: "bot" };
+      const data = response.data;
+      const botMessage = {
+        text: data.response,
+        sender: "bot",
+        actions: data.actions || [] // Include action buttons from LLM
+      };
 
       setMessages(prevMessages => {
         const updatedMessages = [...prevMessages, botMessage];
@@ -180,37 +175,10 @@ export default function Chatbot() {
     }
   };
 
-  const handleCamera = () => {
-    navigate("/camera");
-  };
-
   const handleToggleChatHistory = () => {
     setShowChatHistory(!showChatHistory);
     if (!showChatHistory) {
       fetchChatSessions();
-    }
-  };
-
-  const handleShareChat = () => {
-    if (messages.length <= 1) {
-      alert("Start a conversation first before sharing!");
-      return;
-    }
-
-    const chatText = messages.map(msg =>
-      `${msg.sender === 'user' ? name : 'Dr.Chat'}: ${msg.text}`
-    ).join('\n\n');
-
-    if (navigator.share) {
-      navigator.share({
-        title: 'My MediBot Conversation',
-        text: chatText
-      }).catch(err => {
-        console.error('Error sharing:', err);
-        alert("Couldn't share the chat. Copy feature coming soon!");
-      });
-    } else {
-      alert("Sharing feature coming soon!");
     }
   };
 
@@ -219,10 +187,8 @@ export default function Chatbot() {
       setIsLoading(true);
       const userId = localStorage.getItem("Email");
 
-      const response = await fetch(`https://medical-chatbot-02.onrender.com/api/chat/${selectedSessionId}?userId=${encodeURIComponent(userId)}`);
-      if (!response.ok) throw new Error("Failed to fetch chat history");
-
-      const chatData = await response.json();
+      const response = await axiosClient.get(`/api/chat/${selectedSessionId}?userId=${encodeURIComponent(userId)}`);
+      const chatData = response.data;
 
       setSessionId(selectedSessionId);
       localStorage.setItem("chatSessionId", selectedSessionId);
@@ -234,9 +200,9 @@ export default function Chatbot() {
       const formattedMessages = Array.isArray(chatData.messages)
         ? chatData.messages
         : chatData.map(msg => ({
-            text: msg.content || msg.text,
-            sender: msg.role === 'user' ? 'user' : 'bot'
-          }));
+          text: msg.content || msg.text,
+          sender: msg.role === 'user' ? 'user' : 'bot'
+        }));
 
       if (formattedMessages.length === 0) {
         setMessages([]);
@@ -255,89 +221,12 @@ export default function Chatbot() {
     }
   };
 
-  const handleLogin = () => {
-    navigate("/login");
-  };
-
-  const handleVoice = () => {
-    navigate("/voice");
-  };
-
-  const handleChatbot = () => {
-    navigate("/chatbot");
-  };
-  const handleGoGraph=()=>{
-    navigate("/graph");
-  }
-
-  const handleReport = async () => {
-    const formattedMessages = messages.map(msg => ({
-      sender: msg.sender,
-      text: msg.text
-    }));
-
-    const userId = localStorage.getItem("Email");
-    const sessionId = localStorage.getItem("chatSessionId");
-
-    console.log("🔍 Data to be sent:", { userId, sessionId, formattedMessages });
-
-    if (!userId || !sessionId || !formattedMessages.length) {
-      console.error("❌ Missing required data. Please check userId, sessionId, or messages.");
-      return;
-    }
-
-    try {
-      const response = await fetch("https://medical-chatbot-02.onrender.com/api/analyze", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          userId,
-          sessionId,
-          messages: formattedMessages,
-          emotion: currentEmotion // Include the emotion in analysis requests
-        })
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`API Error: ${response.status} - ${errorText}`);
-      }
-
-      const data = await response.json();
-      if (!data?.chatReport) {
-        console.warn("⚠️ No chat report received from API.");
-        return;
-      }
-
-      setReportData(data.chatReport);
-      setUserReport(true);
-      console.log("✅ Updated Report Data:", data.chatReport);
-
-    } catch (error) {
-      console.error("❗ Error fetching report data:", error.message || error);
-    }
-  };
-
   const handleClose = () => {
     setUserReport(false);
   };
 
   return (
-    <div className={`min-h-screen italic flex ${isDarkMode ? "bg-gray-900 text-white" : "bg-white text-gray-800"}`}>
-      <Sidebar
-        handleRefreshChat={handleRefreshChat}
-        handleToggleChatHistory={handleToggleChatHistory}
-        handleShareChat={handleShareChat}
-        isDarkMode={isDarkMode}
-        handleLogin={handleLogin}
-        showChatHistory={showChatHistory}
-        handleVoice={handleVoice}
-        handleChatbot={handleChatbot}
-        handleCamera={handleCamera}
-      />
-
+    <div className={`h-full italic flex flex-col ${isDarkMode ? "bg-gray-900 text-white" : "bg-white text-gray-800"}`}>
       {showChatHistory && (
         <ChatHistory
           chatHistory={chatHistory}
@@ -350,15 +239,13 @@ export default function Chatbot() {
       )}
 
       <div className={`flex-1 flex flex-col h-screen ${isDarkMode ? "bg-gray-900 text-white" : "bg-white text-gray-800"}`}>
-        <div className={`border-b p-3 flex justify-between items-center ${isDarkMode ? "border-gray-700 bg-gray-800 text-gray-200" : "border-gray-200 bg-gray-50 text-gray-800"}`}>
+        <div className={`border-b p-3 flex justify-between items-center ${isDarkMode ? "border-gray-700 bg-gray-800 text-gray-200" : "border-blue-100 bg-blue-50 text-gray-800"}`}>
           <h2 className="font-medium w-4/5 text-center">{currentSessionTitle || "New Chat"}</h2>
-          <TbReportAnalytics onClick={handleReport} size={25}/>
-          <GoGraph  onClick={handleGoGraph}/>
         </div>
 
         {userReport && (
           <div className="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50">
-            <div className="bg-white p-6 rounded-lg shadow-lg max-w-3xl w-130 relative">
+            <div className={`p-6 rounded-lg shadow-lg max-w-3xl w-130 relative ${isDarkMode ? "bg-gray-800 text-white" : "bg-white text-gray-800"}`}>
               <button
                 onClick={handleClose}
                 className="absolute top-2 right-2 text-gray-600 hover:text-red-500"
@@ -366,7 +253,7 @@ export default function Chatbot() {
                 ✖
               </button>
               <GoGraph />
-              <Report info={reportData} func={setReportData}  messages={messages}/>
+              <Report info={reportData} func={setReportData} messages={messages} />
             </div>
           </div>
         )}
@@ -388,6 +275,12 @@ export default function Chatbot() {
           currentEmotion={currentEmotion} // Pass the emotion to ChatInput
         />
       </div>
+
+      {/* Login Modal */}
+      <LoginModal
+        isOpen={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+      />
     </div>
   );
 }

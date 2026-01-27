@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import axios from "axios";
+import { axiosClient } from "../axios";
 
 const FitbitCallback = () => {
   useEffect(() => {
@@ -18,7 +18,7 @@ const FitbitCallback = () => {
       const authHeader = `Basic ${btoa(`${CLIENT_ID}:${CLIENT_SECRET}`)}`;
 
       try {
-        const response = await axios.post(
+        const response = await axiosClient.post(
           tokenUrl,
           new URLSearchParams({
             client_id: CLIENT_ID,

@@ -7,10 +7,8 @@ deep-translator
 langdetect
 langchain
 transformers
-torch
 nltk
 pymongo
-tensorflow-cpu==2.15.0
 opencv-python
 numpy
 keras

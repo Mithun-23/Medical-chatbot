@@ -4,9 +4,12 @@ import { Moon, Sun, Mic, Send, MessageCircle, Gamepad2, Volume2, History } from 
 import { Link } from 'react-scroll';
 import { useNavigate } from 'react-router-dom';
 import '../styles.css';
+import { axiosClient } from "../axios";
+import LoginModal from "./LoginModal";
 
 const HomePage = () => {
   const { isDarkMode, setIsDarkMode } = useContext(ThemeContext);
+  const [showLoginModal, setShowLoginModal] = useState(false);
   const navigate = useNavigate();
 
   const toggleTheme = () => {
@@ -15,7 +18,7 @@ const HomePage = () => {
 
   const developers = [
     {
-      name: "Mohamed Arsath H",
+      name: "Mithun Balaje K",
       position: "Backend Engineer",
       feedback: "Passionate about building scalable and efficient backend systems.",
       linkedin: "https://www.linkedin.com/in/arsath02/",
@@ -26,18 +29,18 @@ const HomePage = () => {
       feedback: "Ensuring data integrity and optimizing database performance.",
       linkedin: "https://www.linkedin.com/in/ragav-r/"
     },
-    {
-      name: "Mohammed Sameer B",
-      position: "Frontend Engineer",
-      feedback: "Crafting intuitive and visually engaging user interfaces.",
-      linkedin: "https://www.linkedin.com/in/mohammed-sameer-b-ab751b255/"
-    },
-    {
-      name: "Sherin Aamina I",
-      position: "Marketing Specialist",
-      feedback: "Strategizing and executing impactful marketing campaigns.",
-      linkedin: "https://www.linkedin.com/in/sherin-aaminaa-443937259/"
-    }
+    // {
+    //   name: "Mohammed Sameer B",
+    //   position: "Frontend Engineer",
+    //   feedback: "Crafting intuitive and visually engaging user interfaces.",
+    //   linkedin: "https://www.linkedin.com/in/mohammed-sameer-b-ab751b255/"
+    // },
+    // {
+    //   name: "Sherin Aamina I",
+    //   position: "Marketing Specialist",
+    //   feedback: "Strategizing and executing impactful marketing campaigns.",
+    //   linkedin: "https://www.linkedin.com/in/sherin-aaminaa-443937259/"
+    // }
   ];
 
   const features = [
@@ -91,17 +94,10 @@ const HomePage = () => {
     setMessage("");
 
     try {
-      const response = await fetch("https://apparent-wolf-obviously.ngrok-free.app/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: userMessage.text }),
-      });
-      console.log(String(response)+" rog");
-      if (!response.ok) {
-        throw new Error(`HTTP error! Status: ${response.status}`);
-      }
+      const response = await axiosClient.post("/api/chat", { message: userMessage.text });
+      console.log(String(response) + " rog");
 
-      const data = await response.json();
+      const data = response.data;
       const botMessage = { text: data.response, sender: "bot" };
 
       setChatHistory(prevMessages => {
@@ -176,13 +172,13 @@ const HomePage = () => {
                   {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
                 </button>
                 <button
-                  onClick={() => navigate('/login')}
-                  className={`px-4 py-2 text-sm font-medium rounded-lg ${isDarkMode ? "bg-white text-black hover:bg-gray-300" : "bg-gray-600 text-white hover:bg-gray-700"}`}>
+                  onClick={() => setShowLoginModal(true)}
+                  className={`px-4 py-2 text-sm font-medium rounded-lg ${isDarkMode ? "bg-white text-black hover:bg-gray-300" : "bg-blue-600 text-white hover:bg-blue-700"}`}>
                   Login
                 </button>
                 <button
                   onClick={() => navigate('/signup')}
-                  className={`px-4 py-2 text-sm font-medium rounded-lg ${isDarkMode ? "bg-white text-black hover:bg-gray-300" : "bg-gray-600 text-white hover:bg-gray-700"}`}>
+                  className={`px-4 py-2 text-sm font-medium rounded-lg ${isDarkMode ? "bg-gray-700 text-white hover:bg-gray-600" : "bg-gray-200 text-gray-800 hover:bg-gray-300"}`}>
                   Sign Up
                 </button>
               </div>
@@ -196,14 +192,12 @@ const HomePage = () => {
             <div className="grid gap-6 lg:grid-cols-2 lg:gap-12 items-center">
               <div className="flex flex-col justify-center space-y-4">
                 <div className="space-y-2">
-                  <h1 className={`text-3xl font-bold tracking-tighter px-6 sm:text-4xl md:text-5xl lg:text-6xl ${
-                    isDarkMode ? 'text-gray-100' : 'text-gray-700'
-                  }`}>
+                  <h1 className={`text-3xl font-bold tracking-tighter px-6 sm:text-4xl md:text-5xl lg:text-6xl ${isDarkMode ? 'text-gray-100' : 'text-gray-700'
+                    }`}>
                     Your Emotional Support Companion
                   </h1>
-                  <p className={`max-w-[600px] ${
-                    isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                  } px-6 md:text-xl`}>
+                  <p className={`max-w-[600px] ${isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                    } px-6 md:text-xl`}>
                     Connect with Dr. Chat, an AI-powered mental health assistant that listens,
                     learns, and supports you on your journey.
                   </p>
@@ -211,11 +205,10 @@ const HomePage = () => {
               </div>
 
 
-              <div className={`mx-auto lg:mx-0 rounded-lg border ${
-                isDarkMode ? 'border-gray-800 bg-gray-950' : 'border-gray-200 bg-white'
-              } p-4 shadow-lg lg:order-last`}>
-                <div className="flex flex-col h-[400px] w-full max-w-md">
-                  <div className="p-3 border-b border-gray-200 dark:border-gray-800">
+              <div className={`mx-auto lg:mx-0 rounded-lg border ${isDarkMode ? 'border-gray-800 bg-gray-950' : 'border-gray-200 bg-white'
+                } p-4 shadow-lg lg:order-last`}>
+                <div className="flex flex-col h-[400px] w-full">
+                  <div className={`p-3 border-b ${isDarkMode ? "border-gray-800" : "border-gray-200"}`}>
                     <h3 className={`font-medium ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}>
                       Chat Preview
                     </h3>
@@ -223,22 +216,19 @@ const HomePage = () => {
 
                   <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-none">
                     {chatHistory.map((msg, index) => (
-                      <div key={index} className={`flex justify-${msg.sender === 'user' ? 'end' : 'start'}`}>
-                        <div className={`flex items-start gap-2 max-w-[80%]`}>
-                          <span className="relative flex shrink-0 overflow-hidden rounded-full h-8 w-8 border border-gray-200 dark:border-gray-800">
-                            <div className="h-full w-full rounded-full bg-gray-700 flex items-center justify-center text-white text-xs">
+                      <div key={index} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                        <div className={`flex items-start gap-2 max-w-[80%] ${msg.sender === 'user' ? 'flex-row-reverse' : ''}`}>
+                          <span className={`relative flex shrink-0 overflow-hidden rounded-full h-8 w-8 border ${isDarkMode ? "border-gray-800" : "border-gray-200"}`}>
+                            <div className={`h-full w-full rounded-full flex items-center justify-center text-white text-xs ${msg.sender === 'user' ? 'bg-blue-600' : 'bg-gray-700'}`}>
                               {msg.sender === 'user' ? 'U' : 'B'}
                             </div>
                           </span>
-                          <div className={`rounded-lg px-3 py-2 ${
-                            msg.sender === 'user'
-                              ? isDarkMode
-                                ? 'bg-gray-700 text-white'
-                                : 'bg-gray-200 text-black'
-                              : isDarkMode
+                          <div className={`rounded-lg px-3 py-2 ${msg.sender === 'user'
+                            ? 'bg-blue-600 text-white'
+                            : isDarkMode
                               ? 'bg-gray-800 text-gray-100'
                               : 'bg-gray-100 text-gray-900'
-                          }`}>
+                            }`}>
                             <p className="text-sm">
                               {msg.sender === 'bot' && index === chatHistory.length - 1
                                 ? displayedMessage
@@ -253,20 +243,18 @@ const HomePage = () => {
                   <div className={`p-3 border-t ${isDarkMode ? 'border-gray-800' : 'border-gray-200'}`}>
                     <div className="flex items-center gap-2">
                       <input
-                        className={`flex h-10 w-full rounded-md border px-3 py-2 text-base bg-background ${
-                          isDarkMode ? 'text-gray-300 border-gray-700' : 'text-gray-700 border-gray-300'
-                        } focus:outline-none focus:ring-0`}
+                        className={`flex h-10 w-full rounded-md border px-3 py-2 text-base bg-background ${isDarkMode ? 'text-gray-300 border-gray-700' : 'text-gray-700 border-gray-300'
+                          } focus:outline-none focus:ring-0`}
                         placeholder="Type a message..."
                         value={message}
                         onChange={(e) => setMessage(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
                       />
                       <button
-                        className={`h-10 w-10 flex items-center justify-center rounded-md ${
-                          isDarkMode
-                            ? 'bg-gray-700 text-white hover:bg-gray-800'
-                            : 'bg-gray-200 text-black hover:bg-gray-300'
-                        } focus:outline-none focus:ring-0`}
+                        className={`h-10 w-10 flex items-center justify-center rounded-md ${isDarkMode
+                          ? 'bg-gray-700 text-white hover:bg-gray-800'
+                          : 'bg-gray-200 text-black hover:bg-gray-300'
+                          } focus:outline-none focus:ring-0`}
                         onClick={handleSendMessage}
                       >
                         <Send className="w-5 h-5" />
@@ -290,7 +278,7 @@ const HomePage = () => {
                 <h2 className={`text-3xl font-bold tracking-tighter md:text-4xl ${isDarkMode ? "text-gray-100" : "text-gray-800"}`}>
                   Features Designed for You
                 </h2>
-                <p className={`max-w-[700px] ${isDarkMode ? "text-gray-400":"text-gray-700"} md:text-xl`}>
+                <p className={`max-w-[700px] ${isDarkMode ? "text-gray-400" : "text-gray-700"} md:text-xl`}>
                   Our chatbot combines advanced AI with thoughtful features to provide personalized support.
                 </p>
               </div>
@@ -300,18 +288,15 @@ const HomePage = () => {
               {features.map((feature, index) => (
                 <div
                   key={index}
-                  className={`flex flex-col items-center text-center p-6 rounded-lg border ${
-                    isDarkMode ? "border-gray-800 bg-gray-950" : "border-gray-200 bg-white"
-                  } shadow-sm transition-all hover:shadow-md`}
+                  className={`flex flex-col items-center text-center p-6 rounded-lg border ${isDarkMode ? "border-gray-800 bg-gray-950" : "border-gray-200 bg-white"
+                    } shadow-sm transition-all hover:shadow-md`}
                 >
-                  <div className={`mb-4 rounded-full p-3 ${
-                    isDarkMode ? "bg-gray-900 text-gray-300" : "bg-gray-100 text-gray-700"
-                  }`}>
+                  <div className={`mb-4 rounded-full p-3 ${isDarkMode ? "bg-gray-900 text-gray-300" : "bg-gray-100 text-gray-700"
+                    }`}>
                     <feature.icon className='w-7 h-7' />
                   </div>
-                  <h3 className={`text-xl font-bold mb-2 ${
-                    isDarkMode ? "text-gray-100" : "text-gray-900"
-                  }`}>
+                  <h3 className={`text-xl font-bold mb-2 ${isDarkMode ? "text-gray-100" : "text-gray-900"
+                    }`}>
                     {feature.title}
                   </h3>
                   <p className={isDarkMode ? "text-gray-400" : "text-gray-600"}>
@@ -327,14 +312,12 @@ const HomePage = () => {
         <section id="developers" className={`py-12 ${isDarkMode ? "bg-gray-800" : "bg-gray-100"}`}>
           <div className="container px-4 mx-auto">
             <div className="flex flex-col items-center justify-center space-y-2 text-center">
-              <h2 className={`text-3xl font-bold tracking-tighter md:text-4xl ${
-                isDarkMode ? "text-gray-100" : "text-gray-800"
-              }`}>
+              <h2 className={`text-3xl font-bold tracking-tighter md:text-4xl ${isDarkMode ? "text-gray-100" : "text-gray-800"
+                }`}>
                 Developers
               </h2>
-              <p className={`max-w-[700px] md:text-lg ${
-                isDarkMode ? "text-gray-400" : "text-gray-700"
-              }`}>
+              <p className={`max-w-[700px] md:text-lg ${isDarkMode ? "text-gray-400" : "text-gray-700"
+                }`}>
                 Meet the team behind the innovation, dedicated to building seamless experiences.
               </p>
             </div>
@@ -343,23 +326,20 @@ const HomePage = () => {
               {developers.map((dev, index) => (
                 <div
                   key={index}
-                  className={`w-full max-w-sm flex flex-col items-center text-center p-6 rounded-lg border ${
-                    isDarkMode ? "border-gray-800 bg-gray-950" : "border-gray-200 bg-white"
-                  } shadow-sm transition-all hover:shadow-md`}
+                  className={`w-full max-w-sm flex flex-col items-center text-center p-6 rounded-lg border ${isDarkMode ? "border-gray-800 bg-gray-950" : "border-gray-200 bg-white"
+                    } shadow-sm transition-all hover:shadow-md`}
                 >
                   <a
                     href={dev.linkedin}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className={`text-xl font-bold mb-2 ${
-                      isDarkMode ? "text-gray-100 hover:text-gray-300" : "text-gray-900 hover:text-gray-700"
-                    }`}
+                    className={`text-xl font-bold mb-2 ${isDarkMode ? "text-gray-100 hover:text-gray-300" : "text-gray-900 hover:text-gray-700"
+                      }`}
                   >
                     {dev.name}
                   </a>
-                  <h4 className={`text-md font-medium mb-2 ${
-                    isDarkMode ? "text-gray-400" : "text-gray-600"
-                  }`}>
+                  <h4 className={`text-md font-medium mb-2 ${isDarkMode ? "text-gray-400" : "text-gray-600"
+                    }`}>
                     {dev.position}
                   </h4>
                   <p className={isDarkMode ? "text-gray-400" : "text-gray-600"}>
@@ -372,8 +352,8 @@ const HomePage = () => {
         </section>
 
 
-      
-     {/* <section id="developers" className={`py-12 px-4 sm:px-6 lg:px-12 ${isDarkMode ? "bg-gray-800" : "bg-gray-100"}`}>
+
+        {/* <section id="developers" className={`py-12 px-4 sm:px-6 lg:px-12 ${isDarkMode ? "bg-gray-800" : "bg-gray-100"}`}>
         <div className="container mx-auto">
           <div className="flex flex-col items-center justify-center space-y-2 text-center">
             <h2 className={`text-2xl sm:text-3xl md:text-4xl font-bold tracking-tighter ${isDarkMode ? "text-gray-100" : "text-gray-800"}`}>
@@ -406,36 +386,44 @@ const HomePage = () => {
         </div>
       </section> */}
 
-      <section id="contact" className={`py-10 ${isDarkMode ? "bg-gray-900 text-white" : "bg-gray-100 text-black"}`}>
-        <div className="container mx-auto px-6 flex flex-col md:flex-row justify-between items-center md:items-start">
-          {/* Left Side - Branding */}
-          <div className="text-center md:text-left mb-6 md:mb-0 px-8">
-            <h2 className="text-2xl font-bold">🅓r. 𝙲𝚑𝚊𝚝</h2>
-            <p className="text-gray-400">Your companion for emotional support and mental wellbeing.</p>
-            <p className="text-gray-400">
-              Mail us at <a href="mailto:drchat@gmail.com" className={` ${isDarkMode ? "text-gray-200" : "text-gray-600"} hover:underline`}>drchat@gmail.com</a>
-            </p>
-          </div>
-          {/* Right Side - Links */}
-          <div className="flex flex-row space-x-12">
-            <div>
-              <h3 className="text-lg font-semibold">Links</h3>
-              <ul className="text-gray-400 space-y-1">
-                <li><a href="">LinkedIn</a></li>
-                <li><a href="">Github</a></li>
-              </ul>
+        <section id="contact" className={`py-10 ${isDarkMode ? "bg-gray-900 text-white" : "bg-gray-100 text-black"}`}>
+          <div className="container mx-auto px-6 flex flex-col md:flex-row justify-between items-center md:items-start">
+            {/* Left Side - Branding */}
+            <div className="text-center md:text-left mb-6 md:mb-0 px-8">
+              <h2 className="text-2xl font-bold">🅓r. 𝙲𝚑𝚊𝚝</h2>
+              <p className="text-gray-400">Your companion for emotional support and mental wellbeing.</p>
+              <p className="text-gray-400">
+                Mail us at <a href="mailto:drchat@gmail.com" className={` ${isDarkMode ? "text-gray-200" : "text-gray-600"} hover:underline`}>drchat@gmail.com</a>
+              </p>
             </div>
+            {/* Right Side - Links */}
+            <div className="flex flex-row space-x-12">
+              <div>
+                <h3 className="text-lg font-semibold">Links</h3>
+                <ul className="text-gray-400 space-y-1">
+                  <li><a href="">LinkedIn</a></li>
+                  <li><a href="">Github</a></li>
+                </ul>
+              </div>
 
+            </div>
           </div>
-        </div>
-        {/* Footer */}
-        <div className="text-center text-gray-500 mt-8 text-sm">
-          © 2025 Dr. Chat. All rights reserved.
-        </div>
-      </section>
-    </div>
+          {/* Footer */}
+          <div className="text-center text-gray-500 mt-8 text-sm">
+            © 2025 Dr. Chat. All rights reserved.
+          </div>
+        </section>
+      </div>
+
+      {/* Login Modal */}
+      <LoginModal
+        isOpen={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+        onSuccess={() => navigate('/chatbot')}
+      />
     </div>
   );
 };
 
 export default HomePage;
+

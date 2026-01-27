@@ -1,11 +1,11 @@
 import React from 'react';
+import { axiosClient } from "../axios";
 
-function Game (){
+function Game() {
   const runGame = (game) => {
-    fetch(`https://apparent-wolf-obviously.ngrok-free.app/run-game/${game}`)
-      .then(response => response.json())
-      .then(data => {
-        alert(data.message);
+    axiosClient.get(`https://apparent-wolf-obviously.ngrok-free.app/run-game/${game}`)
+      .then(response => {
+        alert(response.data.message);
       })
       .catch(error => {
         console.error('Error running game:', error);
