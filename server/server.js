@@ -15,10 +15,15 @@ app.use(bodyParser.json());
 app.use(express.json());
 
 // Initialize Firebase Admin
-const serviceAccount = require('./service-account.json'); // Update the path
-admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount)
-});
+try {
+    const serviceAccount = require('./service-account.json'); // Update the path
+    admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount)
+    });
+} catch (error) {
+    console.warn('⚠️ Service account file not found. Using default app initialization.');
+    admin.initializeApp();
+}
 
 // Middleware for Firebase Authentication (Now Fetches Email)
 const verifyToken = async (req, res, next) => {

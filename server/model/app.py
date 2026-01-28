@@ -11,6 +11,7 @@ from langchain_core.prompts import PromptTemplate
 import traceback
 import re
 from pymongo import MongoClient
+from datetime import datetime
 
 import numpy as np
 from flask import Flask, request, jsonify, Response
@@ -22,7 +23,12 @@ load_dotenv()
 
 translate = GoogleTranslator()
 
-client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+# Initialize Groq client with error handling
+try:
+    client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+except Exception as e:
+    print(f"Groq client initialization error: {e}")
+    client = None
 memory = ConversationBufferMemory(memory_key="history", return_messages=True)
 memory_context = memory.load_memory_variables({})
 conversation_history = memory_context.get("history", "")
@@ -111,6 +117,100 @@ def parse_actions(text):
 
 memory_store = {}
 
+# MongoDB collection for long-term medical memory
+medical_memory_collection = db["medical_memory"]
+
+
+def extract_medical_facts(message):
+    """Extract medically relevant facts from user messages"""
+    facts = []
+    
+    # Keywords that indicate medical facts
+    medical_keywords = ['fever', 'headache', 'depression', 'anxiety', 'pain', 'cough', 
+                       'cold', 'flu', 'injury', 'medication', 'treatment', 'diagnosis',
+                       'symptom', 'condition', 'health', 'doctor', 'hospital']
+    
+    message_lower = message.lower()
+    
+    # Extract facts based on keywords
+    for keyword in medical_keywords:
+        if keyword in message_lower:
+            facts.append({
+                'fact_type': 'medical_history',
+                'content': f"User reported {keyword}",
+                'keyword': keyword
+            })
+    
+    # Extract temporal information (basic)
+    temporal_patterns = ['today', 'yesterday', 'last week', 'monday', 'tuesday', 'wednesday', 
+                        'thursday', 'friday', 'saturday', 'sunday', 'morning', 'evening']
+    
+    for pattern in temporal_patterns:
+        if pattern in message_lower:
+            facts.append({
+                'fact_type': 'temporal_reference',
+                'content': f"Time reference: {pattern}",
+                'temporal': pattern
+            })
+    
+    return facts
+
+
+def save_medical_facts(session_id, facts):
+    """Save extracted medical facts to MongoDB"""
+    if not facts:
+        return
+    
+    for fact in facts:
+        medical_memory_collection.insert_one({
+            'session_id': session_id,
+            'fact_type': fact['fact_type'],
+            'content': fact['content'],
+            'timestamp': str(datetime.now()),
+            'keyword': fact.get('keyword'),
+            'temporal': fact.get('temporal')
+        })
+
+
+def get_medical_history(session_id):
+    """Retrieve medical history for a session from MongoDB"""
+    try:
+        history_records = medical_memory_collection.find(
+            {'session_id': session_id}
+        ).sort('timestamp', 1)
+        
+        facts = []
+        for record in history_records:
+            facts.append(record['content'])
+        
+        return facts
+    except Exception as e:
+        print(f"Error retrieving medical history: {e}")
+        return []
+
+
+@app.route("/api/clear-chat", methods=["POST"])
+def clear_chat():
+    """Clear short-term chat history for a session"""
+    try:
+        data = request.json
+        session_id = data.get("sessionId", "")
+        
+        if not session_id:
+            return jsonify({"error": "Session ID required"}), 400
+        
+        # Clear only the in-memory conversation buffer
+        if session_id in memory_store:
+            del memory_store[session_id]
+        
+        # Create new empty memory for this session
+        memory_store[session_id] = ConversationBufferMemory(return_messages=True)
+        
+        return jsonify({"success": True})
+    
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 @app.route("/api/chat", methods=["POST"])
 def chatbot():
@@ -141,22 +241,88 @@ def chatbot():
 
         memory = memory_store[session_id]
 
+        # Extract and save medical facts from user message
+        medical_facts = extract_medical_facts(user_message_english)
+        save_medical_facts(session_id, medical_facts)
+
         # Load memory context
         history_context = memory.load_memory_variables({}).get("history", "")
 
-        # Prepare prompt
+        # Get long-term medical history
+        medical_history = get_medical_history(session_id)
+        medical_history_str = "\n".join(medical_history) if medical_history else "No previous medical history recorded."
+
+        # Prepare prompt with medical history context
         prompt = PROMPT_TEMPLATE.format(
-            history=history_context, user_input=user_message_english, emotion=emotion
+            history=history_context, 
+            user_input=user_message_english, 
+            emotion=emotion
         )
 
+        # Add medical history context to the prompt
+        if medical_history_str != "No previous medical history recorded.":
+            prompt += f"\n\nKnown medical history: {medical_history_str}"
+
+        # Check if client is available
+        if client is None:
+            # Fallback response if API fails
+            chatbot_response_english = "Hello! I'm Dr.Chat, your medical assistant. How can I help you today?"
+            
+            # Save the conversation to memory
+            memory.save_context(
+                {"input": user_message_english}, {"output": chatbot_response_english}
+            )
+            
+            # Translate back to Tamil if needed
+            if needs_translation_back:
+                chatbot_response = GoogleTranslator(source="en", target="ta").translate(
+                    chatbot_response_english
+                )
+            else:
+                chatbot_response = chatbot_response_english
+
+            return jsonify({"response": chatbot_response, "actions": []})
+
+        # STRICT medical-only system prompt - MUST be first message
+        medical_system_prompt = '''You are a STRICT MEDICAL CHATBOT. You are NOT a general AI assistant. You ONLY answer questions related to health, medical symptoms, mental health, wellness, lifestyle, and healthcare information.
+
+RULES (ABSOLUTE):
+- If the user asks ANY non-medical question (coding, HTML, programming, API keys, technology, games, general knowledge), you MUST NOT answer it.
+- For non-medical questions, respond with EXACTLY this sentence and nothing else:
+"I'm designed only to help with medical and health-related questions. Please ask something related to your health."
+- You MUST NOT provide code, programming help, or technical explanations.
+- You MUST NOT prescribe medicines, tablets, or dosages.
+- You may provide general health information and emotional support.
+- When appropriate, advise consulting a licensed medical professional.'''
+
         # Call your LLM (replace with actual client call)
-        response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",  # ✅ Replace with your active model
-            messages=[
-                {"role": "system", "content": prompt},
-                {"role": "user", "content": user_message_english},
-            ],
-        )
+        try:
+            response = client.chat.completions.create(
+                model="llama-3.3-70b-versatile",  # ✅ Replace with your active model
+                messages=[
+                    {"role": "system", "content": medical_system_prompt},
+                    {"role": "user", "content": user_message_english},
+                ],
+            )
+        except Exception as api_error:
+            print(f"API Error: {api_error}")
+            # Fallback response if API fails
+            chatbot_response_english = "Hello! I'm Dr.Chat, your medical assistant. How can I help you today?"
+            
+            # Save the conversation to memory
+            memory.save_context(
+                {"input": user_message_english}, {"output": chatbot_response_english}
+            )
+            
+            # Translate back to Tamil if needed
+            if needs_translation_back:
+                chatbot_response = GoogleTranslator(source="en", target="ta").translate(
+                    chatbot_response_english
+                )
+            else:
+                chatbot_response = chatbot_response_english
+
+            return jsonify({"response": chatbot_response, "actions": []})
 
         chatbot_response_english = response.choices[0].message.content.strip()
 
@@ -183,86 +349,8 @@ def chatbot():
         return jsonify({"error": str(e)}), 500
 
 
-"""
-@app.route('/api/chat', methods=['POST'])
-def chatbot():
-    print("Received message:", request.json)
-    print("Headers:", request.headers)
-    data = request.json
-    user_message = data.get("message", "")
-    session_id = data.get("sessionId", "")
-
-    if not user_message or not session_id:
-        return jsonify({"error": "Message or Session ID missing"}), 400
-
-    try:
-        # Detect language
-        detected_lang = detect(user_message)
-
-        needs_translation_back = False
-        if detected_lang == 'ta':  # Tamil detected
-            user_message_english = GoogleTranslator(source='ta', target='en').translate(user_message)
-            needs_translation_back = True
-        else:
-            user_message_english = user_message
-
-        # Load session-specific history
-        session_history = memory.get("session_history", {}).get(session_id, [])
 
 
-
-        # Format the history by joining messages in conversation flow
-        previous_messages = "\n".join(
-            [f"{msg['sender']}: {msg['text']}" for msg in session_history.get("messages", [])]
-        )
-
-        # Format the prompt with session-specific history
-        prompt = PROMPT_TEMPLATE.format(
-            history=previous_messages,
-            user_input=user_message_english
-        )
-
-        # Generate response
-        response = client.chat.completions.create(
-            model="deepseek-r1-distill-llama-70b",
-            messages=[
-                {"role": "system", "content": prompt},
-                {"role": "user", "content": user_message_english}
-            ]
-        )
-
-        chatbot_response_english = response.choices[0].message.content
-
-        # Save conversation in session-specific memory
-        new_message = {
-            "sender": "user",
-            "text": user_message_english,
-            "timestamp": str(datetime.now())
-        }
-
-        bot_response = {
-            "sender": "bot",
-            "text": chatbot_response_english,
-            "timestamp": str(datetime.now())
-        }
-
-        memory.save_session_context(
-            session_id=session_id,
-            inputs=new_message,
-            outputs=bot_response
-        )
-
-        if needs_translation_back:
-            chatbot_response = GoogleTranslator(source='en', target='ta').translate(chatbot_response_english)
-            tanglish_response = chatbot_response.replace(" ", " ")
-        else:
-            tanglish_response = chatbot_response_english
-
-        return jsonify({"response": tanglish_response})
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-"""
 
 # ngrok.set_auth_token("2a1iGE4Q5SDAF4mhdAVXeNptwJd_2GBcW2ACMaj2JoAJy8Gtt")
 # listener = ngrok.forward(

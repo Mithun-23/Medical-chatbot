@@ -9,7 +9,7 @@ import { useContext } from "react";
 import { ThemeContext } from "./ThemeContext";
 import Report from './Report';
 import { GoGraph } from "react-icons/go";
-import { axiosClient } from "../axios";
+import { axiosClient, chatAxiosClient } from "../axios";
 import LoginModal from "./LoginModal";
 import ActionButton from "./ActionButton";
 export default function Chatbot() {
@@ -77,20 +77,38 @@ export default function Chatbot() {
     }
 
     try {
-      const response = await axiosClient.get(`/api/sessions?userId=${encodeURIComponent(userId)}`);
+      const response = await chatAxiosClient.get(`/api/sessions/${encodeURIComponent(userId)}`);
+      
+      // Check if response is successful (200 status)
+      if (response.status !== 200) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
       const sessions = response.data;
 
-      const formattedSessions = sessions.map(session => ({
-        id: session.id || session.sessionId,
-        title: session.title || `Chat ${new Date(session.timestamp || session.createdAt).toLocaleDateString()}`,
-        date: new Date(session.timestamp || session.createdAt).toLocaleDateString(),
-        preview: session.preview || "Click to view chat"
-      }));
+      const formattedSessions = Array.isArray(sessions) 
+        ? sessions.map(session => ({
+            id: session.id || session.sessionId,
+            title: session.title || `Chat ${new Date(session.timestamp || session.createdAt).toLocaleDateString()}`,
+            date: new Date(session.timestamp || session.createdAt).toLocaleDateString(),
+            preview: session.preview || "Click to view chat"
+          }))
+        : [];
 
       setChatHistory(formattedSessions);
+      // Clear any error that might have been set previously
+      setError(null);
     } catch (error) {
       console.error("Failed to fetch sessions", error);
-      setError("Failed to load chat history. Please try again.");
+      // Only set error for actual failures, not empty sessions
+      if (error.response && error.response.status !== 404) {
+        // 404 is expected when user has no chat sessions
+        setError("Failed to load chat history. Please try again.");
+      } else if (!error.response) {
+        // Network or other errors
+        setError("Failed to load chat history. Please try again.");
+      }
+      // For 404 errors (no sessions), we don't set an error
     }
   };
 
@@ -128,12 +146,9 @@ export default function Chatbot() {
         localStorage.setItem("chatSessionTitle", currentTitle);
       }
 
-      const response = await axiosClient.post("/api/chat", {
-        userId,
+      const response = await chatAxiosClient.post("/api/chat", {
         message: messageText,
-        sessionId,
-        title: currentTitle,
-        emotion: currentEmotion // Include current emotion in the API request
+        sessionId
       });
 
       const data = response.data;
@@ -185,10 +200,16 @@ export default function Chatbot() {
   const loadChat = async (selectedSessionId) => {
     try {
       setIsLoading(true);
+      setError(null); // Clear any existing error before loading
       const userId = localStorage.getItem("Email");
 
-      const response = await axiosClient.get(`/api/chat/${selectedSessionId}?userId=${encodeURIComponent(userId)}`);
+      const response = await chatAxiosClient.get(`/api/history/${selectedSessionId}`);
       const chatData = response.data;
+
+      // Check if response is successful (200 status)
+      if (response.status !== 200) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
 
       setSessionId(selectedSessionId);
       localStorage.setItem("chatSessionId", selectedSessionId);
@@ -204,18 +225,30 @@ export default function Chatbot() {
           sender: msg.role === 'user' ? 'user' : 'bot'
         }));
 
+      // Handle empty history as success case
       if (formattedMessages.length === 0) {
         setMessages([]);
         setIsFirstMessageSent(false);
+        // Ensure no error is shown for empty history
+        setError(null);
       } else {
         setMessages(formattedMessages);
         setIsFirstMessageSent(true);
       }
 
       setShowChatHistory(false);
+      // Error state is already cleared at the start, so no need to clear it again on success
     } catch (error) {
       console.error("Error loading chat history:", error);
-      setError("Failed to load chat. Please try again.");
+      // Only set error for actual failures, not empty history
+      if (error.response && error.response.status !== 404) {
+        // 404 is expected for new sessions with no history
+        setError("Failed to load chat. Please try again.");
+      } else if (!error.response) {
+        // Network or other errors
+        setError("Failed to load chat. Please try again.");
+      }
+      // For 404 errors (new sessions), we don't set an error
     } finally {
       setIsLoading(false);
     }
@@ -223,6 +256,39 @@ export default function Chatbot() {
 
   const handleClose = () => {
     setUserReport(false);
+  };
+
+  const handleClearChat = async () => {
+    // Clear UI immediately
+    setMessages([]);
+    setIsFirstMessageSent(false);
+    setError(null); // Clear any existing error
+    localStorage.setItem("chatMessages", JSON.stringify([]));
+    
+    // Reset session title
+    setCurrentSessionTitle("New Chat");
+    localStorage.setItem("chatSessionTitle", "New Chat");
+    
+    try {
+      const response = await fetch('http://localhost:5000/api/clear-chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ sessionId })
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to clear chat');
+      }
+      
+      // Backend cleared successfully - UI already cleared above
+      console.log("Chat history cleared successfully");
+      
+    } catch (error) {
+      // Log error but don't show UI error since UI is already cleared
+      console.warn("Backend clear failed, but UI is cleared:", error);
+    }
   };
 
   return (
@@ -240,7 +306,7 @@ export default function Chatbot() {
 
       <div className={`flex-1 flex flex-col h-screen ${isDarkMode ? "bg-gray-900 text-white" : "bg-white text-gray-800"}`}>
         <div className={`border-b p-3 flex justify-between items-center ${isDarkMode ? "border-gray-700 bg-gray-800 text-gray-200" : "border-blue-100 bg-blue-50 text-gray-800"}`}>
-          <h2 className="font-medium w-4/5 text-center">{currentSessionTitle || "New Chat"}</h2>
+          <h2 className="font-medium w-full text-center">{currentSessionTitle || "New Chat"}</h2>
         </div>
 
         {userReport && (
@@ -266,6 +332,21 @@ export default function Chatbot() {
             onEmotionChange={handleEmotionChange} // Pass the emotion handler to ChatMessages
           />
         </div>
+        
+        {/* Clear Chat Button - fixed position near bottom */}
+        {messages.length > 0 && (
+          <div className="sticky bottom-0 p-3 bg-gradient-to-t from-white to-transparent dark:from-gray-900 dark:to-transparent">
+            <div className="flex justify-center">
+              <button 
+                onClick={handleClearChat}
+                className={`px-4 py-2 text-sm rounded-lg transition-all duration-200 ${isDarkMode ? "bg-red-600 hover:bg-red-700 text-white" : "bg-red-500 hover:bg-red-600 text-white"}`}
+                title="Clear Chat History"
+              >
+                Clear Chat History
+              </button>
+            </div>
+          </div>
+        )}
 
         <ChatInput
           handleSendMessage={handleSendMessage}
