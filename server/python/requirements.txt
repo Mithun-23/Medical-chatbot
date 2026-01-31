@@ -12,3 +12,6 @@ pymongo
 opencv-python
 numpy
 keras
+tensorflow
+pillow
+deepface

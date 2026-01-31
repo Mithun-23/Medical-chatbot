@@ -1,6 +1,105 @@
 import React, { useEffect, useRef, useState, useContext } from "react";
+import { useNavigate } from "react-router-dom";
 import { ThemeContext } from "./ThemeContext";
 import ActionButton from "./ActionButton";
+
+// Parse markdown-style links [text](url) and raw URLs from message
+const parseMessageWithLinks = (text) => {
+  if (!text) return [];
+
+  // Regex for markdown links: [text](url)
+  const markdownLinkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
+
+  // Regex for raw URLs (http/https) not already part of a markdown link
+  // This is a simplified regex; production usage might need a more complex one
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+
+  const parts = [];
+  let lastIndex = 0;
+  let match;
+
+  // First pass: Find markdown links
+  // We need to handle this carefully if we want to support both. 
+  // A simple approach is to split by markdown links first.
+
+  const segments = [];
+  let currentText = text;
+
+  while ((match = markdownLinkRegex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      segments.push({ type: 'text', content: text.slice(lastIndex, match.index) });
+    }
+    segments.push({ type: 'link', text: match[1], url: match[2] });
+    lastIndex = match.index + match[0].length;
+  }
+
+  if (lastIndex < text.length) {
+    segments.push({ type: 'text', content: text.slice(lastIndex) });
+  }
+
+  // Second pass: Find raw URLs in text segments
+  const finalParts = [];
+  segments.forEach(segment => {
+    if (segment.type === 'link') {
+      finalParts.push(segment);
+    } else {
+      // Check for raw URLs in this text segment
+      let subLastIndex = 0;
+      let subMatch;
+      const subText = segment.content;
+
+      while ((subMatch = urlRegex.exec(subText)) !== null) {
+        if (subMatch.index > subLastIndex) {
+          finalParts.push({ type: 'text', content: subText.slice(subLastIndex, subMatch.index) });
+        }
+        finalParts.push({ type: 'link', text: subMatch[1], url: subMatch[1] });
+        subLastIndex = subMatch.index + subMatch[0].length;
+      }
+      if (subLastIndex < subText.length) {
+        finalParts.push({ type: 'text', content: subText.slice(subLastIndex) });
+      }
+    }
+  });
+
+  return finalParts.length > 0 ? finalParts : [{ type: 'text', content: text }];
+};
+
+// Component to render text with clickable links
+const LinkifiedText = ({ text, isDarkMode }) => {
+  const navigate = useNavigate();
+  const parts = parseMessageWithLinks(text);
+
+  return (
+    <>
+      {parts.map((part, index) => {
+        if (part.type === 'link') {
+          const isInternalLink = part.url.startsWith('/');
+          return (
+            <a
+              key={index}
+              href={part.url}
+              onClick={(e) => {
+                if (isInternalLink) {
+                  e.preventDefault();
+                  navigate(part.url);
+                }
+              }}
+              target={isInternalLink ? undefined : "_blank"}
+              rel={isInternalLink ? undefined : "noopener noreferrer"}
+              className={`font-semibold underline transition-colors ${isDarkMode
+                ? 'text-blue-400 hover:text-blue-300'
+                : 'text-blue-600 hover:text-blue-700'
+                }`}
+            >
+              {part.text}
+            </a>
+          );
+        }
+        return <span key={index}>{part.content}</span>;
+      })}
+    </>
+  );
+};
 
 const TypingEffect = ({ text }) => {
   const [displayedText, setDisplayedText] = useState("");
@@ -108,6 +207,8 @@ const MessageBubble = ({ message, userInitial, isDarkMode, isLatestBotMessage, s
           <p className="text-sm whitespace-pre-wrap">
             {message.sender === "bot" && shouldShowTypingEffect ? (
               <TypingEffect text={message.text} />
+            ) : message.sender === "bot" ? (
+              <LinkifiedText text={message.text} isDarkMode={isDarkMode} />
             ) : (
               message.text
             )}
@@ -176,23 +277,27 @@ export default function ChatMessages({ messages, isLoading, error, onEmotionChan
   }, [onEmotionChange]);
 
   useEffect(() => {
+    // Skip animation on initial load - only animate truly new messages
     if (isInitialLoadRef.current) {
       isInitialLoadRef.current = false;
       prevMessagesRef.current = [...messages];
+      // Mark that we've seen all current messages, so don't animate them
       return;
     }
 
+    // Only animate if we have MORE messages than before (new message added)
     if (messages.length > prevMessagesRef.current.length) {
       const lastMessageIndex = messages.length - 1;
       const lastMessage = messages[lastMessageIndex];
 
-      if (lastMessage.sender === "bot") {
+      // Only animate bot messages that are genuinely new (not loaded from storage)
+      if (lastMessage.sender === "bot" && !lastMessage._loaded) {
         setShowTypingEffect(true);
         setTypingMessageIndex(lastMessageIndex);
 
         const timer = setTimeout(() => {
           setShowTypingEffect(false);
-        }, lastMessage.text.length * 20 + 100);
+        }, Math.min(lastMessage.text.length * 20 + 100, 3000)); // Cap at 3s
 
         return () => clearTimeout(timer);
       }

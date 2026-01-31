@@ -1,8 +1,8 @@
-import React, { useContext, useEffect, useState } from "react";
-import { axiosClient } from "../axios";
+import React, { useContext } from "react";
 import {
   LineChart,
-  AreaChart, Area,
+  AreaChart,
+  Area,
   Line,
   XAxis,
   YAxis,
@@ -11,547 +11,445 @@ import {
   ResponsiveContainer,
   Legend,
   BarChart,
-  Bar
+  Bar,
 } from "recharts";
 import { ThemeContext } from "./ThemeContext";
-import StressGraph from "./StressGraph";
+import { useFitnessData } from "../hooks/useFitnessData";
 
-export const HeartRateComponent = () => {
-  const [heartRateData, setHeartRateData] = useState([]);
-  const [heartRateZones, setHeartRateZones] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const { isDarkMode } = useContext(ThemeContext);
-  const timeframe = "1d";
-
-  useEffect(() => {
-    const fetchHeartRateData = async () => {
-      const token = localStorage.getItem("fitbit_access_token");
-      if (!token) {
-        console.log("No access token, redirecting to login...");
-        window.location.href = "/";
-        return;
-      }
-
-      try {
-        const headers = { Authorization: `Bearer ${token}` };
-
-
-        const heartRateResponse = await axiosClient.get(
-          `https://api.fitbit.com/1/user/-/activities/heart/date/today/${timeframe}.json`,
-          { headers }
-        );
-
-        console.log("Heart Rate Data:", heartRateResponse.data);
-
-        // const heartRateDict = createFitbitDataDictionary(heartRateResponse.data);
-        // console.log("Heart Rate Dictionary:", heartRateDict);
-        const heartData = heartRateResponse.data["activities-heart"].map((item) => ({
-          date: item.dateTime,
-          outOfRange: item.value.heartRateZones[0]?.minutes || 0,
-          fatBurn: item.value.heartRateZones[1]?.minutes || 0,
-          cardio: item.value.heartRateZones[2]?.minutes || 0,
-          peak: item.value.heartRateZones[3]?.minutes || 0,
-          restingHeartRate: item.value.restingHeartRate || 0
-        }));
-
-        setHeartRateZones(heartData);
-
-
-        try {
-          const intradayResponse = await axiosClient.get(
-            `https://api.fitbit.com/1/user/-/activities/heart/date/today/1d/1min.json`,
-            { headers }
-          );
-
-          console.log("Intraday Heart Rate:", intradayResponse.data);
-
-          // const intradayDict = createFitbitDataDictionary(intradayResponse.data);
-          // console.log("Intraday Heart Rate Dictionary:", intradayDict);
-          if (intradayResponse.data["activities-heart-intraday"]?.dataset) {
-            const intradayData = intradayResponse.data["activities-heart-intraday"].dataset.map(item => ({
-              time: item.time,
-              value: item.value
-            }));
-
-            setHeartRateData(intradayData);
-          }
-        } catch (intradayError) {
-          console.log("Intraday data not available:", intradayError);
-
-        }
-      } catch (error) {
-        console.error("Error fetching Fitbit heart rate data:", error);
-        setError("Failed to load heart rate data");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchHeartRateData();
-  }, [timeframe]);
-
-  if (loading) {
-    return (
-      <div className={`dashboard-container ${isDarkMode ? "bg-gray-900 text-white" : "bg-gray-100 text-black"}`}>
-        <h2 className={` ${isDarkMode ? "text-white" : "text-gray-900"} text-white text-xl font-semibold mb-4`}>Heart Rate Data</h2>
-        <div className={`${isDarkMode ? "text-white" : "text-gray-900"}`}>Loading heart rate data...</div>
+// Stat Card Component with gradient background
+const StatCard = ({ icon, title, value, unit, subtitle, gradient, isDarkMode }) => (
+  <div
+    className={`relative overflow-hidden rounded-2xl p-5 shadow-lg transition-all duration-300 hover:scale-105 hover:shadow-xl ${gradient}`}
+  >
+    <div className="relative z-10">
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-3xl">{icon}</span>
+        <span className="text-xs uppercase tracking-wider opacity-80 font-medium">
+          {title}
+        </span>
       </div>
-    );
-  }
-
-  if (error && heartRateZones.length === 0) {
-    return (
-      <div className={`dashboard-container ${isDarkMode ? "bg-gray-900 text-white" : "bg-gray-100 text-black"}`}>
-        <h2 className={` ${isDarkMode ? "text-white" : "text-gray-900"} text-xl font-semibold mb-4`}>Heart Rate Data</h2>
-        <div className={`${isDarkMode ? "text-white" : "text-gray-900"}`}>{error}</div>
+      <div className="text-4xl font-bold text-white mb-1">
+        {value}
+        <span className="text-lg font-normal ml-1 opacity-80">{unit}</span>
       </div>
-    );
-  }
-
-  return (
-    <div className={`dashboard-container ${isDarkMode ? "bg-gray-900 text-white" : "bg-gray-100 text-black"}`}>
-      <h2 className={` ${isDarkMode ? "text-white" : "text-gray-900"} text-xl font-semibold mb-4`}>Heart Rate Data</h2>
-
-
-      <div className={`dashboard-container mb-8 ${isDarkMode ? "bg-gray-900 text-white" : "bg-gray-100 text-black"}`}>
-        <h3 className={` ${isDarkMode ? "text-white" : "text-gray-900"} text-lg font-medium mb-2`}>Time in Heart Rate Zones (minutes)</h3>
-        <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={heartRateZones}>
-            <XAxis dataKey="date" tick={{ fill: "#fff" }} />
-            <YAxis tick={{ fill: "#fff" }} />
-            <Tooltip />
-            <CartesianGrid strokeDasharray="3 3" stroke="#444" />
-            <Legend />
-            <Bar dataKey="outOfRange" fill="#ff4757" name="Out of Range" />
-            <Bar dataKey="fatBurn" fill="#FFA500" name="Fat Burn" />
-            <Bar dataKey="cardio" fill="#1e90ff" name="Cardio" />
-            <Bar dataKey="peak" fill="#32cd32" name="Peak" />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-
-
-      {heartRateZones.length > 0 && heartRateZones[0].restingHeartRate > 0 && (
-        <div className={`mb-8 ${isDarkMode ? "bg-gray-900" : "bg-gray-100 "}`}>
-          <h3 className={` ${isDarkMode ? "text-white" : "text-gray-900"} text-lg font-medium mb-2`}>Resting Heart Rate</h3>
-          <div className={` ${isDarkMode ? "bg-gray-900" : "bg-gray-100"} rounded-lg p-4 text-center`}>
-            <div className="text-5xl font-bold text-red-400">
-              {heartRateZones[0].restingHeartRate}
-            </div>
-            <div className={` ${isDarkMode ? "text-white" : "text-gray-900"} mt-2`}>BPM</div>
-          </div>
-        </div>
-      )}
-
-
-      {heartRateData.length > 0 && (
-        <div className="chart-container">
-          <h3 className={` ${isDarkMode ? "text-white" : "text-gray-900"} text-lg font-medium mb-2`}>Intraday Heart Rate</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={heartRateData}>
-              <XAxis
-                dataKey="time"
-                tick={{ fill: "#fff" }}
-                interval="preserveStartEnd"
-                minTickGap={50}
-              />
-              <YAxis
-                tick={{ fill: "#fff" }}
-                domain={['dataMin - 10', 'dataMax + 10']}
-              />
-              <Tooltip />
-              <CartesianGrid strokeDasharray="3 3" stroke="#444" />
-              <Line
-                type="monotone"
-                dataKey="value"
-                stroke="#ff4757"
-                strokeWidth={2}
-                name="Heart Rate (BPM)"
-                dot={false}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
+      {subtitle && (
+        <div className="text-sm opacity-80">{subtitle}</div>
       )}
     </div>
-  );
-};
-export const StepsComponent = () => {
-  const [stepsData, setStepsData] = useState([]);
-  const timeframe = "1w";
-  const { isDarkMode } = useContext(ThemeContext);
+    {/* Decorative circle */}
+    <div className="absolute -right-4 -bottom-4 w-24 h-24 rounded-full bg-white opacity-10" />
+  </div>
+);
 
-  useEffect(() => {
-    const fetchStepsData = async () => {
-      const token = localStorage.getItem("fitbit_access_token");
-      if (!token) {
-        console.log("No access token, redirecting to login...");
-        window.location.href = "/";
-        return;
-      }
+// Health Score Ring Component
+const HealthScoreRing = ({ score, size = 120, strokeWidth = 10, isDarkMode }) => {
+  const radius = (size - strokeWidth) / 2;
+  const circumference = radius * 2 * Math.PI;
+  const offset = circumference - (score / 100) * circumference;
 
-      try {
-        const headers = { Authorization: `Bearer ${token}` };
-
-
-        const stepsResponse = await axiosClient.get(
-          `https://api.fitbit.com/1/user/-/activities/steps/date/today/${timeframe}.json`,
-          { headers }
-        );
-
-        console.log("Steps Data:", stepsResponse.data);
-        //   const stepsDict = createFitbitDataDictionary(stepsResponse.data);
-        // console.log("Steps Dictionary:", stepsDict);
-
-        const formattedStepsData = stepsResponse.data["activities-steps"].map((item) => ({
-          date: item.dateTime,
-          steps: parseInt(item.value, 10)
-        }));
-
-        setStepsData(formattedStepsData);
-      } catch (error) {
-        console.error("Error fetching Fitbit steps data:", error);
-      }
-    };
-
-    fetchStepsData();
-  }, [timeframe]);
+  let color = '#10B981'; // green
+  if (score < 50) color = '#EF4444'; // red
+  else if (score < 70) color = '#F59E0B'; // yellow
 
   return (
-    <div className={`dashboard-container ${isDarkMode ? "bg-gray-900 text-white" : "bg-gray-100 text-black"}`}>
-      <h2 className={`text-xl font-semibold mb-4 `}>Daily Steps</h2>
-      <div className="chart-container">
-        <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={stepsData}>
-            <XAxis dataKey="date" tick={{ fill: "#fff" }} />
-            <YAxis tick={{ fill: "#fff" }} />
-            <Tooltip />
-            <CartesianGrid strokeDasharray="3 3" stroke="#444" />
-            <Bar dataKey="steps" fill="#4F98CA" name="Steps" />
-          </BarChart>
-        </ResponsiveContainer>
+    <div className="relative inline-flex items-center justify-center">
+      <svg width={size} height={size} className="-rotate-90">
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke={isDarkMode ? '#374151' : '#E5E7EB'}
+          strokeWidth={strokeWidth}
+        />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke={color}
+          strokeWidth={strokeWidth}
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          className="transition-all duration-1000 ease-out"
+        />
+      </svg>
+      <div className="absolute flex flex-col items-center">
+        <span className={`text-3xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+          {score}
+        </span>
+        <span className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+          / 100
+        </span>
       </div>
     </div>
   );
 };
 
-
-const SleepComponent = () => {
-  //const [sleepData, setSleepData] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const { isDarkMode } = useContext(ThemeContext);
-  const sleepData = [
-    {
-      date: "2025-03-04",
-      deep: 1.5,  // hours
-      light: 4,   // hours
-      rem: 2,     // hours
-      wake: 0.5,  // hours
-      totalHours: 8,
-    },
-    {
-      date: "2025-03-05",
-      deep: 1.2,
-      light: 3.5,
-      rem: 1.8,
-      wake: 0.4,
-      totalHours: 7.5,
-    },
-    {
-      date: "2025-03-06",
-      deep: 1.8,
-      light: 4.2,
-      rem: 2.1,
-      wake: 0.3,
-      totalHours: 8.4,
-    },
-    {
-      date: "2025-03-07",
-      deep: 1.4,
-      light: 3.8,
-      rem: 1.9,
-      wake: 0.5,
-      totalHours: 7.6,
-    },
-    {
-      date: "2025-03-08",
-      deep: 1.7,
-      light: 4.1,
-      rem: 2,
-      wake: 0.6,
-      totalHours: 8.4,
-    },
-    {
-      date: "2025-03-09",
-      deep: 1.6,
-      light: 4,
-      rem: 1.9,
-      wake: 0.5,
-      totalHours: 8,
-    },
-    {
-      date: "2025-03-10",
-      deep: 1.3,
-      light: 3.7,
-      rem: 1.6,
-      wake: 0.4,
-      totalHours: 7,
-    }
-  ];
-
-
-  useEffect(() => {
-    const fetchSleepData = async () => {
-      const token = localStorage.getItem("fitbit_access_token");
-      if (!token) {
-        console.log("No access token, redirecting to login...");
-        window.location.href = "/";
-        return;
-      }
-
-      const headers = { Authorization: `Bearer ${token}` };
-
-      try {
-        const today = new Date().toISOString().split('T')[0];
-        const sevenDaysAgo = new Date();
-        sevenDaysAgo.setDate(new Date().getDate() - 7);
-        const formattedSevenDaysAgo = sevenDaysAgo.toISOString().split('T')[0];
-
-
-        const sleepRangeResponse = await axiosClient.get(
-          `https://api.fitbit.com/1.2/user/-/sleep/date/${formattedSevenDaysAgo}/${today}.json`,
-          { headers }
-        );
-        const sleepData = sleepRangeResponse.data;
-
-        // Send data to your backend
-        await axiosClient.post('http://localhost:/send-sleep-data', { sleepData });
-
-        // const sleepDict = createFitbitDataDictionary(sleepRangeResponse.data);
-        // console.log("Sleep Dictionary:", sleepDict);
-
-        const formattedSleepData = sleepRangeResponse.data.sleep?.map((sleep) => ({
-          date: sleep.dateOfSleep,
-          deep: sleep.levels?.summary.deep?.minutes / 60 || 0,
-          light: sleep.levels?.summary.light?.minutes / 60 || 0,
-          rem: sleep.levels?.summary.rem?.minutes / 60 || 0,
-          wake: sleep.levels?.summary.wake?.minutes / 60 || 0,
-          totalHours: sleep.duration / (1000 * 60 * 60),
-        }));
-
-        if (formattedSleepData?.length > 0) {
-          setSleepData(formattedSleepData);
-        } else {
-          setError("No sleep data available for the past week.");
-        }
-      } catch (error) {
-        console.error("Error fetching Fitbit sleep data:", error);
-        setError("Failed to load sleep data");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchSleepData();
-  }, []);
-  if (loading) {
-    return (
-      <div className={`dashboard-container mt-8 ${isDarkMode ? "bg-gray-900 text-white" : "bg-gray-100 text-black"}`}>
-        <h2 className={`text-xl font-semibold mb-4 ${isDarkMode ? "text-white" : "text-gray-900"}`}>Sleep Analysis</h2>
-        <div className={` ${isDarkMode ? "text-white" : "text-gray-900"}`}>Loading sleep data...</div>
-      </div>
-    );
-  }
-
-  if (error && sleepData.length === 0) {
-    return (
-      <div className={`dashboard-container mt-8 ${isDarkMode ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-900"}`}>
-        <h2 className={` ${isDarkMode ? "text-white" : "text-gray-900"} text-xl font-semibold mb-4`}>Sleep Analysis</h2>
-        <div className={` ${isDarkMode ? "text-white" : "text-gray-900"}`}>{error}</div>
-      </div>
-    );
-  }
+// Insight Card Component
+const InsightCard = ({ insight, isDarkMode }) => {
+  const bgColors = {
+    success: isDarkMode ? 'bg-green-900/30 border-green-500/30' : 'bg-green-50 border-green-200',
+    warning: isDarkMode ? 'bg-yellow-900/30 border-yellow-500/30' : 'bg-yellow-50 border-yellow-200',
+    info: isDarkMode ? 'bg-blue-900/30 border-blue-500/30' : 'bg-blue-50 border-blue-200',
+  };
 
   return (
-    <div className={`dashboard-container mt-8 ${isDarkMode ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-900"}`}>
-      <h2 className={` ${isDarkMode ? "text-white" : "text-gray-900"} text-xl font-semibold mb-4`}>Sleep Analysis</h2>
-      <div className="chart-container">
-        <ResponsiveContainer width="100%" height={300}>
-          <AreaChart data={sleepData}>
-            <XAxis dataKey="date" tick={{ fill: "#fff" }} />
-            <YAxis tick={{ fill: "#fff" }} label={{ value: 'Hours', angle: -90, position: 'insideLeft', fill: '#fff' }} />
-            <Tooltip />
-            <CartesianGrid strokeDasharray="3 3" stroke="#444" />
-            <Legend />
-            <Area type="monotone" dataKey="totalHours" stroke="#8884d8" fill="#8884d8" name="Total Sleep" />
-            {sleepData[0] && sleepData[0].deep > 0 && (
-              <>
-                <Area type="monotone" dataKey="deep" stackId="1" stroke="#0047AB" fill="#0047AB" name="Deep" />
-                <Area type="monotone" dataKey="light" stackId="1" stroke="#6495ED" fill="#6495ED" name="Light" />
-                <Area type="monotone" dataKey="rem" stackId="1" stroke="#B0C4DE" fill="#B0C4DE" name="REM" />
-                <Area type="monotone" dataKey="wake" stackId="1" stroke="#D3D3D3" fill="#D3D3D3" name="Awake" />
-              </>
-            )}
-          </AreaChart>
-        </ResponsiveContainer>
-      </div>
+    <div className={`flex items-start gap-3 p-3 rounded-xl border ${bgColors[insight.type] || bgColors.info}`}>
+      <span className="text-xl">{insight.icon}</span>
+      <p className={`text-sm ${isDarkMode ? 'text-gray-200' : 'text-gray-700'}`}>
+        {insight.text}
+      </p>
     </div>
   );
 };
 
-
-export const ActivityComponent = () => {
-  const [caloriesData, setCaloriesData] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const timeframe = "1w";
-  const { isDarkMode } = useContext(ThemeContext);
-
-  useEffect(() => {
-    const fetchActivityData = async () => {
-      const token = localStorage.getItem("fitbit_access_token");
-      if (!token) {
-        console.log("No access token, redirecting to login...");
-        window.location.href = "/";
-        return;
-      }
-
-      try {
-        const headers = { Authorization: `Bearer ${token}` };
-
-
-        const caloriesResponse = await axiosClient.get(
-          `https://api.fitbit.com/1/user/-/activities/tracker/calories/date/today/${timeframe}.json`,
-          { headers }
-        );
-
-        console.log("Tracker Calories Data:", caloriesResponse.data);
-
-
-        const distanceResponse = await axiosClient.get(
-          `https://api.fitbit.com/1/user/-/activities/tracker/distance/date/today/${timeframe}.json`,
-          { headers }
-        );
-
-        console.log("Distance Data:", distanceResponse.data);
-
-        // const caloriesDict = createFitbitDataDictionary(caloriesResponse.data);
-        // console.log("Calories Dictionary:", caloriesDict);
-
-        if (caloriesResponse.data["activities-tracker-calories"]) {
-          const combinedData = caloriesResponse.data["activities-tracker-calories"].map((caloriesItem) => {
-            const dateMatch = distanceResponse.data["activities-tracker-distance"]?.find(
-              distanceItem => distanceItem.dateTime === caloriesItem.dateTime
-            );
-
-            return {
-              date: caloriesItem.dateTime,
-              calories: parseInt(caloriesItem.value, 10),
-              distance: dateMatch ? parseFloat(dateMatch.value) : 0
-            };
-          });
-
-          setCaloriesData(combinedData);
-        }
-      } catch (error) {
-        console.error("Error fetching Fitbit activity data:", error);
-        setError("Failed to load activity data");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchActivityData();
-  }, [timeframe]);
-
-  if (loading) {
-    return (
-      <div className={`dashboard-container mt-8 ${isDarkMode ? "bg-gray-900 text-white" : "bg-gray-100 text-black"}`}>
-        <h2 className={` ${isDarkMode ? "text-white" : "text-gray-900"} text-xl font-semibold mb-4`}>Activity & Calories</h2>
-        <div className={`${isDarkMode ? "text-white" : "text-gray-900"}`}>Loading activity data...</div>
-      </div>
-    );
-  }
-
-  if (error && caloriesData.length === 0) {
-    return (
-      <div className={`dashboard-container mt-8 ${isDarkMode ? "bg-gray-900 text-white" : "bg-gray-100 text-black"}`}>
-        <h2 className={` ${isDarkMode ? "text-white" : "text-gray-900"} text-xl font-semibold mb-4`}>Activity & Calories</h2>
-        <div className={` ${isDarkMode ? "text-white" : "text-gray-900"}`}>{error}</div>
-      </div>
-    );
-  }
-
-  return (
-    <div className={`dashboard-container mt-8 ${isDarkMode ? "bg-gray-900 text-white" : "bg-gray-100 text-black"}`}>
-      <h2 className={` ${isDarkMode ? "text-white" : "text-gray-900"} text-xl font-semibold mb-4`}>Activity & Calories</h2>
-      <div className="chart-container">
-        <ResponsiveContainer width="100%" height={300}>
-          <LineChart data={caloriesData}>
-            <XAxis dataKey="date" tick={{ fill: "#fff" }} />
-            <YAxis yAxisId="left" tick={{ fill: "#fff" }} />
-            <YAxis yAxisId="right" orientation="right" tick={{ fill: "#fff" }} />
-            <Tooltip />
-            <CartesianGrid strokeDasharray="3 3" stroke="#444" />
-            <Legend />
-            <Line
-              yAxisId="left"
-              type="monotone"
-              dataKey="calories"
-              stroke="#FF6B6B"
-              strokeWidth={2}
-              name="Calories Burned"
-            />
-            <Line
-              yAxisId="right"
-              type="monotone"
-              dataKey="distance"
-              stroke="#48CFAD"
-              strokeWidth={2}
-              name="Distance (km)"
-            />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
-    </div>
-  );
-};
+// Chart wrapper with consistent styling
+const ChartCard = ({ title, children, isDarkMode }) => (
+  <div className={`rounded-2xl p-5 shadow-lg ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
+    <h3 className={`text-lg font-semibold mb-4 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+      {title}
+    </h3>
+    {children}
+  </div>
+);
 
 const Dashboard = () => {
   const { isDarkMode } = useContext(ThemeContext);
+  const {
+    loading,
+    error,
+    heartRate,
+    steps,
+    sleep,
+    activity,
+    healthScores,
+    insights,
+    refresh,
+    logout,
+  } = useFitnessData();
+
+  const chartColors = {
+    text: isDarkMode ? '#9CA3AF' : '#6B7280',
+    grid: isDarkMode ? '#374151' : '#E5E7EB',
+    bg: isDarkMode ? '#1F2937' : '#FFFFFF',
+  };
+
+  const CustomTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className={`p-3 rounded-lg shadow-lg ${isDarkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-900'}`}>
+          <p className="font-medium">{label}</p>
+          {payload.map((entry, index) => (
+            <p key={index} style={{ color: entry.color }}>
+              {entry.name}: {entry.value.toLocaleString()}
+            </p>
+          ))}
+        </div>
+      );
+    }
+    return null;
+  };
+
+  if (loading) {
+    return (
+      <div className={`min-h-screen flex items-center justify-center ${isDarkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+          <p className={`text-lg ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+            Loading your fitness data...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    const isMissingToken = error.includes('No Fitbit token') || error.includes('Fitbit disconnected');
+
+    return (
+      <div className={`min-h-screen flex items-center justify-center ${isDarkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
+        <div className={`text-center p-8 rounded-2xl ${isDarkMode ? 'bg-gray-800' : 'bg-white'} shadow-xl max-w-md w-full mx-4`}>
+          {isMissingToken ? (
+            <>
+              <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-teal-400 to-blue-500 flex items-center justify-center">
+                <span className="text-4xl">⌚</span>
+              </div>
+              <h2 className={`text-2xl font-bold mb-3 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                Connect Your Fitbit
+              </h2>
+              <p className={`mb-6 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                Sync your activity, heart rate, and sleep data to get personalized health insights.
+              </p>
+              <a
+                href={`https://www.fitbit.com/oauth2/authorize?response_type=code&client_id=${import.meta.env.VITE_FITBIT_CLIENT_ID}&redirect_uri=${import.meta.env.VITE_FITBIT_REDIRECT_URI}&scope=activity%20heartrate%20sleep%20profile`}
+                className="inline-block px-8 py-3 bg-gradient-to-r from-teal-500 to-blue-500 text-white font-semibold rounded-xl hover:from-teal-600 hover:to-blue-600 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+              >
+                Connect Fitbit
+              </a>
+            </>
+          ) : (
+            <>
+              <span className="text-5xl mb-4 block">😔</span>
+              <p className={`text-lg mb-4 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{error}</p>
+              <button
+                onClick={refresh}
+                className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+              >
+                Try Again
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className={`italic ${isDarkMode ? "text-white" : "text-gray-900"} min-h-screen overflow-y-auto custom-scrollbar`}>
-      <div className="p-6">
-        <h1 className={` text-2xl font-bold mb-6 ${isDarkMode ? "text-white" : "text-gray-900"}`}>Fitness Dashboard</h1>
+    <div className={`min-h-screen overflow-y-auto ${isDarkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
+      <div className="p-6 max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className={`text-3xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+              Fitness Dashboard
+            </h1>
+            <p className={`mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+              Your health at a glance
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={refresh}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all ${isDarkMode
+                ? 'bg-gray-800 hover:bg-gray-700 text-white'
+                : 'bg-white hover:bg-gray-100 text-gray-900'
+                } shadow-md`}
+            >
+              <span>🔄</span>
+              <span>Refresh</span>
+            </button>
 
+            <button
+              onClick={logout}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all ${isDarkMode
+                ? 'bg-red-900/50 hover:bg-red-900 text-red-200'
+                : 'bg-red-50 hover:bg-red-100 text-red-700'
+                } shadow-md border ${isDarkMode ? 'border-red-800' : 'border-red-200'}`}
+            >
+              <span>❌</span>
+              <span>Disconnect</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Stat Cards Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <StatCard
+            icon="❤️"
+            title="Heart Rate"
+            value={heartRate.resting || '--'}
+            unit="BPM"
+            subtitle={heartRate.resting ? "Resting" : "No data"}
+            gradient="bg-gradient-to-br from-rose-500 to-purple-600"
+            isDarkMode={isDarkMode}
+          />
+          <StatCard
+            icon="🚶"
+            title="Steps"
+            value={steps.today > 0 ? steps.today.toLocaleString() : '--'}
+            unit=""
+            subtitle={steps.today > 0 ? `${Math.round((steps.today / steps.goal) * 100)}% of goal` : "No data"}
+            gradient="bg-gradient-to-br from-blue-500 to-indigo-600"
+            isDarkMode={isDarkMode}
+          />
+          <StatCard
+            icon="😴"
+            title="Sleep"
+            value={sleep.lastNight > 0 ? sleep.lastNight.toFixed(1) : '--'}
+            unit="hrs"
+            subtitle={sleep.quality !== 'Unknown' ? sleep.quality : "No data"}
+            gradient="bg-gradient-to-br from-purple-500 to-indigo-600"
+            isDarkMode={isDarkMode}
+          />
+          <StatCard
+            icon="🔥"
+            title="Calories"
+            value={activity.calories > 0 ? activity.calories.toLocaleString() : '--'}
+            unit="kcal"
+            subtitle={activity.distance > 0 ? `${activity.distance.toFixed(1)} km` : "No data"}
+            gradient="bg-gradient-to-br from-orange-500 to-red-600"
+            isDarkMode={isDarkMode}
+          />
+        </div>
+
+        {/* Health Score & Insights Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          {/* Health Score */}
+          <div className={`rounded-2xl p-6 shadow-lg ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
+            <h3 className={`text-lg font-semibold mb-4 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+              🏆 Health Score
+            </h3>
+            <div className="flex items-center justify-center mb-4">
+              <HealthScoreRing score={healthScores.overall} isDarkMode={isDarkMode} />
+            </div>
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div>
+                <div className={`text-xl font-bold ${isDarkMode ? 'text-red-400' : 'text-red-500'}`}>
+                  {healthScores.heart}
+                </div>
+                <div className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Heart</div>
+              </div>
+              <div>
+                <div className={`text-xl font-bold ${isDarkMode ? 'text-purple-400' : 'text-purple-500'}`}>
+                  {healthScores.sleep}
+                </div>
+                <div className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Sleep</div>
+              </div>
+              <div>
+                <div className={`text-xl font-bold ${isDarkMode ? 'text-blue-400' : 'text-blue-500'}`}>
+                  {healthScores.activity}
+                </div>
+                <div className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Activity</div>
+              </div>
+            </div>
+          </div>
+
+          {/* AI Insights */}
+          <div className={`lg:col-span-2 rounded-2xl p-6 shadow-lg ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
+            <h3 className={`text-lg font-semibold mb-4 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+              🩺 AI Health Insights
+            </h3>
+            <div className="space-y-3">
+              {insights.length > 0 ? (
+                insights.map((insight, index) => (
+                  <InsightCard key={index} insight={insight} isDarkMode={isDarkMode} />
+                ))
+              ) : (
+                <p className={`text-center py-4 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                  Connect your Fitbit to see personalized insights
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Charts Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Steps Chart */}
+          <ChartCard title="📊 Weekly Steps" isDarkMode={isDarkMode}>
+            <ResponsiveContainer width="100%" height={250}>
+              <BarChart data={steps.weeklyData}>
+                <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
+                <XAxis
+                  dataKey="date"
+                  tick={{ fill: chartColors.text, fontSize: 12 }}
+                  tickFormatter={(date) => new Date(date).toLocaleDateString('en', { weekday: 'short' })}
+                />
+                <YAxis tick={{ fill: chartColors.text, fontSize: 12 }} />
+                <Tooltip content={<CustomTooltip />} />
+                <Bar
+                  dataKey="value"
+                  name="Steps"
+                  fill="url(#stepsGradient)"
+                  radius={[4, 4, 0, 0]}
+                />
+                <defs>
+                  <linearGradient id="stepsGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#3B82F6" />
+                    <stop offset="100%" stopColor="#06B6D4" />
+                  </linearGradient>
+                </defs>
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartCard>
 
-          <div className={` ${isDarkMode ? "bg-gray-900" : "bg-gray-100"} rounded-lg p-4 shadow-lg`}>
-            <HeartRateComponent />
-          </div>
+          {/* Heart Rate Zones Chart */}
+          <ChartCard title="💓 Heart Rate Zones" isDarkMode={isDarkMode}>
+            <ResponsiveContainer width="100%" height={250}>
+              <BarChart data={heartRate.zones} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
+                <XAxis type="number" tick={{ fill: chartColors.text, fontSize: 12 }} />
+                <YAxis
+                  dataKey="name"
+                  type="category"
+                  tick={{ fill: chartColors.text, fontSize: 12 }}
+                  width={80}
+                />
+                <Tooltip content={<CustomTooltip />} />
+                <Bar
+                  dataKey="minutes"
+                  name="Minutes"
+                  radius={[0, 4, 4, 0]}
+                >
+                  {heartRate.zones.map((entry, index) => {
+                    const colors = ['#6B7280', '#F59E0B', '#EF4444', '#DC2626'];
+                    return <rect key={index} fill={colors[index] || '#3B82F6'} />;
+                  })}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartCard>
 
-          <div className={`${isDarkMode ? "bg-gray-900" : "bg-gray-100"} rounded-lg p-4 shadow-lg`}>
-            <StepsComponent />
-          </div>
+          {/* Sleep Chart */}
+          <ChartCard title="😴 Sleep Analysis" isDarkMode={isDarkMode}>
+            <ResponsiveContainer width="100%" height={250}>
+              <AreaChart data={sleep.weeklyData}>
+                <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
+                <XAxis
+                  dataKey="date"
+                  tick={{ fill: chartColors.text, fontSize: 12 }}
+                  tickFormatter={(date) => new Date(date).toLocaleDateString('en', { weekday: 'short' })}
+                />
+                <YAxis tick={{ fill: chartColors.text, fontSize: 12 }} />
+                <Tooltip content={<CustomTooltip />} />
+                <Legend />
+                <Area type="monotone" dataKey="deep" stackId="1" stroke="#1E40AF" fill="#1E40AF" name="Deep" />
+                <Area type="monotone" dataKey="light" stackId="1" stroke="#60A5FA" fill="#60A5FA" name="Light" />
+                <Area type="monotone" dataKey="rem" stackId="1" stroke="#A78BFA" fill="#A78BFA" name="REM" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </ChartCard>
 
-
-          <div className={`${isDarkMode ? "bg-gray-900" : "bg-gray-100"} rounded-lg p-4 shadow-lg`}>
-            <SleepComponent />
-          </div>
-
-
-          <div className={`${isDarkMode ? "bg-gray-900" : "bg-gray-100"} rounded-lg p-4 shadow-lg`}>
-            <ActivityComponent />
-          </div>
-          <div className={`${isDarkMode ? "bg-gray-900" : "bg-gray-100"} rounded-lg p-4 shadow-lg`}>
-            <  StressGraph />
-          </div>
+          {/* Activity Chart */}
+          <ChartCard title="🔥 Calories & Distance" isDarkMode={isDarkMode}>
+            <ResponsiveContainer width="100%" height={250}>
+              <LineChart data={activity.weeklyData}>
+                <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
+                <XAxis
+                  dataKey="date"
+                  tick={{ fill: chartColors.text, fontSize: 12 }}
+                  tickFormatter={(date) => new Date(date).toLocaleDateString('en', { weekday: 'short' })}
+                />
+                <YAxis yAxisId="left" tick={{ fill: chartColors.text, fontSize: 12 }} />
+                <YAxis yAxisId="right" orientation="right" tick={{ fill: chartColors.text, fontSize: 12 }} />
+                <Tooltip content={<CustomTooltip />} />
+                <Legend />
+                <Line
+                  yAxisId="left"
+                  type="monotone"
+                  dataKey="calories"
+                  stroke="#F97316"
+                  strokeWidth={2}
+                  name="Calories"
+                  dot={{ fill: '#F97316', strokeWidth: 0 }}
+                />
+                <Line
+                  yAxisId="right"
+                  type="monotone"
+                  dataKey="distance"
+                  stroke="#10B981"
+                  strokeWidth={2}
+                  name="Distance (km)"
+                  dot={{ fill: '#10B981', strokeWidth: 0 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </ChartCard>
         </div>
       </div>
     </div>
-
   );
 };
 

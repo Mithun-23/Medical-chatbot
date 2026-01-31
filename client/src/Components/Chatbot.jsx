@@ -12,6 +12,10 @@ import { GoGraph } from "react-icons/go";
 import { axiosClient } from "../axios";
 import LoginModal from "./LoginModal";
 import ActionButton from "./ActionButton";
+import EmotionCamera from "./EmotionCamera";
+import { FiCamera, FiCameraOff } from "react-icons/fi";
+import { Trash2 } from "lucide-react";
+
 export default function Chatbot() {
   const navigate = useNavigate();
   const { isDarkMode } = useContext(ThemeContext);
@@ -45,7 +49,9 @@ export default function Chatbot() {
   useEffect(() => {
     const storedMessages = JSON.parse(localStorage.getItem("chatMessages"));
     if (storedMessages && storedMessages.length > 0) {
-      setMessages(storedMessages);
+      // Mark messages as loaded from storage so they don't trigger animation
+      const markedMessages = storedMessages.map(msg => ({ ...msg, _loaded: true }));
+      setMessages(markedMessages);
 
       setIsFirstMessageSent(true);
     } else {
@@ -128,12 +134,16 @@ export default function Chatbot() {
         localStorage.setItem("chatSessionTitle", currentTitle);
       }
 
+      // Get fitness context from localStorage (set by Dashboard)
+      const fitnessContext = localStorage.getItem('fitness_context') || '';
+
       const response = await axiosClient.post("/api/chat", {
         userId,
         message: messageText,
         sessionId,
         title: currentTitle,
-        emotion: currentEmotion // Include current emotion in the API request
+        emotion: currentEmotion, // Include current emotion in the API request
+        fitnessContext // Include fitness data for personalized health suggestions
       });
 
       const data = response.data;
@@ -172,6 +182,32 @@ export default function Chatbot() {
 
     if (showChatHistory) {
       setShowChatHistory(false);
+    }
+  };
+
+  // Clear chat - archives messages for chatbot memory but removes visible messages
+  const handleClearChat = async () => {
+    const userId = localStorage.getItem("Email");
+    if (!userId || !sessionId) {
+      console.error("Cannot clear chat: missing user or session");
+      return;
+    }
+
+    try {
+      await axiosClient.post("/api/chat/clear", {
+        userId,
+        sessionId
+      });
+
+      // Clear local messages but keep same session
+      setMessages([]);
+      localStorage.setItem("chatMessages", JSON.stringify([]));
+      setIsFirstMessageSent(false);
+
+      console.log("✅ Chat cleared (memory retained for chatbot)");
+    } catch (error) {
+      console.error("Error clearing chat:", error);
+      setError("Failed to clear chat. Please try again.");
     }
   };
 
@@ -240,8 +276,33 @@ export default function Chatbot() {
 
       <div className={`flex-1 flex flex-col h-screen ${isDarkMode ? "bg-gray-900 text-white" : "bg-white text-gray-800"}`}>
         <div className={`border-b p-3 flex justify-between items-center ${isDarkMode ? "border-gray-700 bg-gray-800 text-gray-200" : "border-blue-100 bg-blue-50 text-gray-800"}`}>
-          <h2 className="font-medium w-4/5 text-center">{currentSessionTitle || "New Chat"}</h2>
+          <h2 className="font-medium flex-1 text-center">{currentSessionTitle || "New Chat"}</h2>
+
+          {/* Camera Toggle Button */}
+          <button
+            onClick={() => setCameraActive(!cameraActive)}
+            className={`p-2 rounded-full transition-all duration-200 ${cameraActive
+              ? 'bg-green-500 text-white hover:bg-green-600'
+              : isDarkMode
+                ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}
+            title={cameraActive ? "Disable emotion camera" : "Enable emotion camera"}
+          >
+            {cameraActive ? <FiCamera size={18} /> : <FiCameraOff size={18} />}
+          </button>
         </div>
+
+        {/* Emotion Camera Component */}
+        {cameraActive && (
+          <div className={`p-3 ${isDarkMode ? 'bg-gray-800' : 'bg-gray-50'}`}>
+            <EmotionCamera
+              isEnabled={cameraActive}
+              onEmotionChange={handleEmotionChange}
+              showPreview={true}
+              frameRate={10}
+            />
+          </div>
+        )}
 
         {userReport && (
           <div className="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50">
@@ -267,13 +328,33 @@ export default function Chatbot() {
           />
         </div>
 
-        <ChatInput
-          handleSendMessage={handleSendMessage}
-          inputValue={inputValue}
-          setInputValue={setInputValue}
-          isLoading={isLoading}
-          currentEmotion={currentEmotion} // Pass the emotion to ChatInput
-        />
+        {/* Clear Chat Button + Chat Input */}
+        <div className="relative">
+          {messages.length > 0 && (
+            <div className={`flex justify-center py-2 ${isDarkMode ? 'bg-gray-800' : 'bg-gray-50'}`}>
+              <button
+                onClick={handleClearChat}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all duration-200 
+                  ${isDarkMode
+                    ? 'bg-gray-700 text-gray-300 hover:bg-red-900 hover:text-red-300'
+                    : 'bg-gray-200 text-gray-600 hover:bg-red-100 hover:text-red-600'
+                  }`}
+                title="Clear chat (chatbot will still remember this conversation)"
+              >
+                <Trash2 className="w-4 h-4" />
+                Clear Chat
+              </button>
+            </div>
+          )}
+
+          <ChatInput
+            handleSendMessage={handleSendMessage}
+            inputValue={inputValue}
+            setInputValue={setInputValue}
+            isLoading={isLoading}
+            currentEmotion={currentEmotion}
+          />
+        </div>
       </div>
 
       {/* Login Modal */}

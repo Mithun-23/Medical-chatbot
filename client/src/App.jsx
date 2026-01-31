@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
+import axios from "axios";
 import Signup from "./Components/Signup";
 import Chatbot from "./Components/Chatbot";
 import Voice from "./Components/Voice";
@@ -9,6 +10,7 @@ import FitbitLogin from "./Components/FitbitLogin";
 import FitbitCallback from "./Components/FitbitCallback";
 import Dashboard from "./Components/Dashboard";
 import GameSelector from "./Components/GameSelector";
+import GamePage from "./Components/GamePage";
 import Profile from "./Components/Profile";
 import Music from "./Music";
 import Game from "./Components/Game";
@@ -23,10 +25,21 @@ function App() {
 
   useEffect(() => {
     const auth = getAuth();
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         setUser(user);
         localStorage.setItem("userId", user.uid);
+
+        // Record daily check-in
+        try {
+          const userEmail = user.email;
+          await axios.post("http://localhost:8000/api/checkin", {
+            userId: userEmail
+          });
+          console.log("✅ Daily check-in recorded");
+        } catch (error) {
+          console.error("Error recording check-in:", error);
+        }
       } else {
         setUser(null);
         localStorage.removeItem("userId");
@@ -57,6 +70,7 @@ function App() {
             <Route path="/callback" element={<FitbitCallback />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/game-selector" element={<GameSelector />} />
+            <Route path="/game/:gameId" element={<GamePage />} />
             <Route path="/camera" element={<Camera />} />
             <Route path="/music" element={<Music />} />
             <Route path="/graph" element={<Graph />} />

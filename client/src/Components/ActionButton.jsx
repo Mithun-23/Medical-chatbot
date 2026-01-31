@@ -111,26 +111,46 @@ const ActionButton = ({ action }) => {
 
                 <div className="space-y-3">
                     <a
-                        href="tel:988"
+                        href="tel:108"
                         className="flex items-center gap-3 p-4 bg-red-50 hover:bg-red-100 rounded-xl transition-colors"
                     >
                         <Phone className="w-5 h-5 text-red-600" />
                         <div>
-                            <p className="font-semibold text-red-800">988 Suicide & Crisis Lifeline</p>
-                            <p className="text-sm text-red-600">Call or text 988 (US)</p>
+                            <p className="font-semibold text-red-800">108 Emergency Ambulance</p>
+                            <p className="text-sm text-red-600">Call 108 (Free, 24/7)</p>
                         </div>
                     </a>
 
                     <a
-                        href="https://www.crisistextline.org"
-                        target="_blank"
-                        rel="noopener noreferrer"
+                        href="tel:9152987821"
                         className="flex items-center gap-3 p-4 bg-blue-50 hover:bg-blue-100 rounded-xl transition-colors"
                     >
-                        <BookOpen className="w-5 h-5 text-blue-600" />
+                        <Phone className="w-5 h-5 text-blue-600" />
                         <div>
-                            <p className="font-semibold text-blue-800">Crisis Text Line</p>
-                            <p className="text-sm text-blue-600">Text HOME to 741741</p>
+                            <p className="font-semibold text-blue-800">iCall Mental Health</p>
+                            <p className="text-sm text-blue-600">9152987821 (Mon-Sat, 8am-10pm)</p>
+                        </div>
+                    </a>
+
+                    <a
+                        href="tel:18602662345"
+                        className="flex items-center gap-3 p-4 bg-purple-50 hover:bg-purple-100 rounded-xl transition-colors"
+                    >
+                        <Phone className="w-5 h-5 text-purple-600" />
+                        <div>
+                            <p className="font-semibold text-purple-800">Vandrevala Foundation</p>
+                            <p className="text-sm text-purple-600">1860-2662-345 (24/7, Free)</p>
+                        </div>
+                    </a>
+
+                    <a
+                        href="tel:08046110007"
+                        className="flex items-center gap-3 p-4 bg-green-50 hover:bg-green-100 rounded-xl transition-colors"
+                    >
+                        <Phone className="w-5 h-5 text-green-600" />
+                        <div>
+                            <p className="font-semibold text-green-800">NIMHANS Helpline</p>
+                            <p className="text-sm text-green-600">080-46110007 (24/7)</p>
                         </div>
                     </a>
                 </div>
@@ -138,8 +158,8 @@ const ActionButton = ({ action }) => {
                 <button
                     onClick={() => setShowEmergencyModal(false)}
                     className={`mt-6 w-full py-3 rounded-xl font-medium ${isDarkMode
-                            ? 'bg-gray-700 text-white hover:bg-gray-600'
-                            : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                        ? 'bg-gray-700 text-white hover:bg-gray-600'
+                        : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
                         }`}
                 >
                     Close
@@ -304,8 +324,8 @@ const ActionButton = ({ action }) => {
                         onChange={(e) => setEntry(e.target.value)}
                         placeholder="Start writing..."
                         className={`w-full h-48 p-4 rounded-xl border resize-none focus:outline-none focus:ring-2 focus:ring-amber-500 ${isDarkMode
-                                ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
-                                : 'bg-gray-50 border-gray-200 text-gray-800 placeholder-gray-400'
+                            ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
+                            : 'bg-gray-50 border-gray-200 text-gray-800 placeholder-gray-400'
                             }`}
                     />
 
@@ -313,8 +333,8 @@ const ActionButton = ({ action }) => {
                         <button
                             onClick={() => setShowJournalModal(false)}
                             className={`flex-1 py-3 rounded-xl font-medium ${isDarkMode
-                                    ? 'bg-gray-700 text-white hover:bg-gray-600'
-                                    : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                                ? 'bg-gray-700 text-white hover:bg-gray-600'
+                                : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
                                 }`}
                         >
                             Cancel

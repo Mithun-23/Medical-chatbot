@@ -9,7 +9,7 @@ export default function MainLayout() {
     return (
         <div className={`min-h-screen flex ${isDarkMode ? "bg-gray-900 text-white" : "bg-white text-gray-800"}`}>
             <Sidebar />
-            <main className="flex-1 ml-16">
+            <main className="flex-1 ml-44">
                 <Outlet />
             </main>
         </div>

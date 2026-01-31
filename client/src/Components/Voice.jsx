@@ -1,281 +1,441 @@
-import React, { useState, useEffect, useContext } from "react";
-import { useNavigate } from 'react-router-dom';
-import { RiMic2Line } from "react-icons/ri";
+import React, { useState, useEffect, useContext, useRef, useCallback } from "react";
+import { RiMic2Line, RiStopCircleLine } from "react-icons/ri";
+import { FiVideo, FiVideoOff } from "react-icons/fi";
 import { ThemeContext } from "./ThemeContext";
 import { axiosClient } from "../axios";
+import { io } from 'socket.io-client';
+import TalkingAvatar from './TalkingAvatar';
+
+const PYTHON_SERVER_URL = 'http://localhost:5000';
 
 export default function Voice() {
-  const navigate = useNavigate();
-  const { isDarkMode, setIsDarkMode } = useContext(ThemeContext);
-  const [showChatHistory, setShowChatHistory] = useState(false);
+  const { isDarkMode } = useContext(ThemeContext);
   const [error, setError] = useState(null);
-  const [isClicked, setIsClicked] = useState(false);
-  const [text, setText] = useState("");
-  const [isListening, setIsListening] = useState(false);
-  const [apiResponse, setApiResponse] = useState("");
+  const [status, setStatus] = useState('idle'); // 'idle' | 'listening' | 'processing' | 'speaking'
+  const [transcript, setTranscript] = useState('');
+  const [voiceSessionId, setVoiceSessionId] = useState(() => {
+    // Get existing session or create new one
+    const stored = localStorage.getItem('voiceSessionId');
+    if (stored) return stored;
+    const newId = `voice-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    localStorage.setItem('voiceSessionId', newId);
+    return newId;
+  });
+  const [messageCount, setMessageCount] = useState(0);
+
+  // Video & emotion state
+  const [isVideoEnabled, setIsVideoEnabled] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
+  const [currentEmotion, setCurrentEmotion] = useState('Neutral');
+  const [faceDetected, setFaceDetected] = useState(false);
+
+  const videoRef = useRef(null);
+  const streamRef = useRef(null);
+  const canvasRef = useRef(null);
+  const socketRef = useRef(null);
+  const frameIntervalRef = useRef(null);
+  const recognitionRef = useRef(null);
+  const speechRef = useRef(null);
+  const keepAliveRef = useRef(null);
 
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  const recognition = SpeechRecognition ? new SpeechRecognition() : null;
 
+  // Initialize Socket.IO connection for emotion detection
   useEffect(() => {
-    if (isDarkMode) {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-    }
-  }, [isDarkMode]);
+    socketRef.current = io(PYTHON_SERVER_URL, {
+      transports: ['polling', 'websocket'],
+      reconnectionAttempts: 3,
+    });
 
-  const handleMicClick = () => {
-    console.log("clicked");
-    setIsClicked(!isClicked);
-    if (recognition) {
-      if (!isListening) {
-        recognition.start();
-        setIsListening(true);
-      } else {
-        recognition.stop();
-        setIsListening(false);
+    socketRef.current.on('connect', () => {
+      console.log('✅ Connected to emotion server');
+      setIsConnected(true);
+    });
+
+    socketRef.current.on('disconnect', () => {
+      setIsConnected(false);
+    });
+
+    socketRef.current.on('emotion_update', (data) => {
+      if (data.emotion) setCurrentEmotion(data.emotion);
+      if (typeof data.face_detected === 'boolean') setFaceDetected(data.face_detected);
+    });
+
+    return () => {
+      if (socketRef.current) socketRef.current.disconnect();
+    };
+  }, []);
+
+  // Capture video frame for emotion detection
+  const captureFrame = useCallback(() => {
+    if (!videoRef.current || !canvasRef.current || !socketRef.current?.connected) return;
+
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+
+    canvas.width = video.videoWidth || 320;
+    canvas.height = video.videoHeight || 240;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    const frameData = canvas.toDataURL('image/jpeg', 0.5);
+    socketRef.current.emit('video_frame', { frame: frameData });
+  }, []);
+
+  // Start video
+  const startVideo = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 320 }, height: { ideal: 240 }, facingMode: 'user' },
+        audio: false
+      });
+
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
       }
-    } else {
-      alert("Speech recognition is not supported in this browser.");
-    }
-  };
 
-  if (recognition) {
+      if (!canvasRef.current) {
+        canvasRef.current = document.createElement('canvas');
+      }
+
+      frameIntervalRef.current = setInterval(captureFrame, 50);
+      setIsVideoEnabled(true);
+      setError(null);
+    } catch (err) {
+      setError(err.name === 'NotAllowedError' ? 'Camera permission denied' : `Camera error: ${err.message}`);
+    }
+  }, [captureFrame]);
+
+  // Stop video
+  const stopVideo = useCallback(() => {
+    if (frameIntervalRef.current) {
+      clearInterval(frameIntervalRef.current);
+      frameIntervalRef.current = null;
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) videoRef.current.srcObject = null;
+    setIsVideoEnabled(false);
+  }, []);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      stopVideo();
+      stopEverything();
+    };
+  }, [stopVideo]);
+
+  // Stop all speech/recognition
+  const stopEverything = useCallback(() => {
+    // Stop speech synthesis
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+    if (keepAliveRef.current) {
+      clearInterval(keepAliveRef.current);
+      keepAliveRef.current = null;
+    }
+
+    // Stop recognition
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.abort();
+      } catch (e) { }
+    }
+
+    setStatus('idle');
+    setTranscript('');
+  }, []);
+
+  // Start listening
+  const startListening = useCallback(() => {
+    if (!SpeechRecognition) {
+      setError('Speech recognition not supported');
+      return;
+    }
+
+    // Stop any ongoing speech first
+    stopEverything();
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'en-IN';
+    recognition.continuous = false; // Single utterance mode
+    recognition.interimResults = true;
+
     recognition.onstart = () => {
-      console.log("Listening...");
+      setStatus('listening');
+      setError(null);
+      setTranscript('');
     };
 
     recognition.onresult = (event) => {
-      const transcript = event.results[0][0].transcript;
-      console.log("Text:", text);
-      console.log("Transcript:", transcript);
-      handleSendMessage(transcript);
-      setText(transcript);
+      let finalTranscript = '';
+      let interimTranscript = '';
+
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const result = event.results[i];
+        if (result.isFinal) {
+          finalTranscript += result[0].transcript;
+        } else {
+          interimTranscript += result[0].transcript;
+        }
+      }
+
+      setTranscript(finalTranscript || interimTranscript);
+
+      if (finalTranscript) {
+        sendMessage(finalTranscript.trim());
+      }
     };
 
     recognition.onerror = (event) => {
-      console.error("Speech recognition error:", event.error);
-      setIsListening(false);
+      console.error('Recognition error:', event.error);
+      if (event.error !== 'no-speech' && event.error !== 'aborted') {
+        setError(`Voice error: ${event.error}`);
+      }
+      setStatus('idle');
     };
 
     recognition.onend = () => {
-      setIsListening(false);
+      if (status === 'listening') {
+        setStatus('idle');
+      }
     };
-  }
 
-  const handleSendMessage = async (textar) => {
-    console.log("Textar:", textar);
+    recognitionRef.current = recognition;
+
     try {
+      recognition.start();
+    } catch (e) {
+      setError('Could not start listening');
+      setStatus('idle');
+    }
+  }, [SpeechRecognition, status]);
+
+  // Send message to backend
+  const sendMessage = async (text) => {
+    if (!text.trim()) return;
+
+    setStatus('processing');
+
+    try {
+      const userId = localStorage.getItem("Email") || "guest";
+      const emotionToSend = faceDetected ? currentEmotion : 'Neutral';
+
+      console.log('Sending message:', text);
+
       const response = await axiosClient.post('/api/chat', {
-        message: textar
+        userId,
+        message: text,
+        sessionId: voiceSessionId,
+        emotion: emotionToSend
       });
 
-      const data = response.data;
-      console.log(data.response);
+      setMessageCount(prev => prev + 1);
 
-      setApiResponse(data.response);
-      setIsClicked(false);
+      console.log('Response received:', response.data);
 
-      // Analyze sentiment from user input
-      const userSentiment = analyzeSentiment(textar);
-      console.log("Detected sentiment:", userSentiment);
-
-      // Also analyze response sentiment for more appropriate delivery
-      const responseSentiment = analyzeSentiment(data.response);
-
-      // Use the response sentiment primarily, but consider user sentiment too
-      // This creates more contextually appropriate speech
-      let finalSentiment = responseSentiment;
-
-      // In some cases, we may want to prioritize the user's emotion
-      if (userSentiment === 'sad' || userSentiment === 'anxious') {
-        // For emotional support, mirror the user's emotion with a calming effect
-        finalSentiment = 'calm';
+      if (response.data && response.data.response) {
+        speakResponse(response.data.response);
+      } else {
+        throw new Error('Empty response from server');
       }
-
-      // Configure and play speech
-      const speech = configureSpeech(data.response, finalSentiment);
-
-      // Cancel any ongoing speech and start speaking
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(speech);
-
     } catch (err) {
-      setError("Failed to get response. Please try again.");
-      console.error("Chat API Error:", err);
+      console.error("Chat error:", err);
+      setError(err.response?.data?.error || err.message || "Failed to get response");
+      setStatus('idle');
     }
   };
-  // ✅ Function to detect sentiment from text
-  const analyzeSentiment = (text) => {
-    // Expanded Tamil emotion keywords
-    const emotions = {
-      happy: ["மகிழ்ச்சி", "நன்றி", "அருமை", "நல்லது", "சந்தோஷம்", "வாழ்த்துக்கள்", "கிள்ளி", "சிரிப்பு", "ஆனந்தம்", "பெருமிதம்"],
-      sad: ["துக்கம்", "அவலம்", "வருத்தம்", "தவிப்பு", "நஷ்டம்", "துயரம்", "மடிப", "கண்ணீர்", "சோகம்", "உடைந்த"],
-      angry: ["கோபம்", "எரிச்சல்", "சினம்", "வெறுப்பு", "தொந்தரவு", "பொறுமை இழப்பு", "ஆத்திரம்"],
-      anxious: ["பயம்", "கவலை", "பதற்றம்", "திகில்", "அச்சம்", "பதட்டம்", "நெருக்கடி"],
-      calm: ["அமைதி", "நிம்மதி", "நிதானம்", "சாந்தம்", "தியானம்", "ஓய்வு"],
-      excited: ["உற்சாகம்", "பரவசம்", "உந்துதல்", "விருப்பம்", "ஆர்வம்"]
-    };
 
-    const textLower = text.toLowerCase();
-
-    // Check each emotion category
-    for (const [emotion, keywords] of Object.entries(emotions)) {
-      if (keywords.some(word => textLower.includes(word))) {
-        return emotion;
-      }
+  // Speak the AI response
+  const speakResponse = (text) => {
+    if (!('speechSynthesis' in window)) {
+      setError('Speech synthesis not supported');
+      setStatus('idle');
+      return;
     }
 
-    // Check for question patterns
-    if (textLower.includes("?") ||
-      textLower.includes("என்ன") ||
-      textLower.includes("எப்படி") ||
-      textLower.includes("ஏன்") ||
-      textLower.includes("எங்கே")) {
-      return "curious";
-    }
+    // Cancel any existing speech
+    window.speechSynthesis.cancel();
 
-    // Default to neutral if no emotion is detected
-    return "neutral";
-  };
-
-  // Enhanced speech synthesis configuration with emotion-based voice parameters
-  const configureSpeech = (text, sentiment) => {
-    // Create speech utterance
     const speech = new SpeechSynthesisUtterance(text);
+    speechRef.current = speech;
 
     // Get available voices
-    const voices = window.speechSynthesis.getVoices();
+    let voices = window.speechSynthesis.getVoices();
+    const englishVoice = voices.find(v => v.lang.includes('en-IN'))
+      || voices.find(v => v.lang.includes('en-US'))
+      || voices.find(v => v.lang.includes('en'))
+      || voices[0];
 
-    const tamilVoice = voices.find(voice =>
-      voice.lang.includes('ta') || voice.name.toLowerCase().includes('tamil') && voice.name.includes('Female')
-    );
+    if (englishVoice) speech.voice = englishVoice;
+    speech.lang = 'en-IN';
+    speech.rate = 1.0;
+    speech.pitch = 1.0;
+    speech.volume = 1.0;
 
-    if (tamilVoice) {
-      speech.voice = tamilVoice;
-      console.log("Using Tamil Voice:", tamilVoice.name);
+    // Chrome keep-alive workaround
+    const startKeepAlive = () => {
+      if (keepAliveRef.current) clearInterval(keepAliveRef.current);
+      keepAliveRef.current = setInterval(() => {
+        if (window.speechSynthesis.speaking && !window.speechSynthesis.paused) {
+          window.speechSynthesis.pause();
+          window.speechSynthesis.resume();
+        }
+      }, 10000);
+    };
+
+    const stopKeepAlive = () => {
+      if (keepAliveRef.current) {
+        clearInterval(keepAliveRef.current);
+        keepAliveRef.current = null;
+      }
+    };
+
+    speech.onstart = () => {
+      console.log('Speech started');
+      setStatus('speaking');
+      startKeepAlive();
+    };
+
+    speech.onend = () => {
+      console.log('Speech ended');
+      stopKeepAlive();
+      setStatus('idle');
+      setTranscript('');
+    };
+
+    speech.onerror = (event) => {
+      console.error('Speech error:', event.error);
+      stopKeepAlive();
+      if (event.error !== 'interrupted' && event.error !== 'canceled') {
+        setError(`Speech error: ${event.error}`);
+      }
+      setStatus('idle');
+    };
+
+    setStatus('speaking');
+    window.speechSynthesis.speak(speech);
+  };
+
+  // Handle mic button click
+  const handleMicClick = () => {
+    if (status === 'idle') {
+      startListening();
     } else {
-      console.warn("Tamil voice not found, using default voice.");
+      // Interrupt and stop everything
+      stopEverything();
     }
+  };
 
-    // Apply emotional voice parameters
-    switch (sentiment) {
-      case 'happy':
-        speech.pitch = 1.2;     // Higher pitch for happiness
-        speech.rate = 1.1;      // Slightly faster
-        speech.volume = 1.0;    // Full volume
-        break;
-      case 'sad':
-        speech.pitch = 0.8;     // Lower pitch for sadness
-        speech.rate = 0.8;      // Slower speed
-        speech.volume = 0.8;    // Slightly softer
-        break;
-      case 'angry':
-        speech.pitch = 1.3;     // Higher pitch
-        speech.rate = 1.3;      // Faster speech
-        speech.volume = 1.0;    // Full volume
-        break;
-      case 'anxious':
-        speech.pitch = 1.1;     // Slightly higher pitch
-        speech.rate = 1.2;      // Faster speech
-        speech.volume = 0.9;    // Slightly reduced volume
-        break;
-      case 'calm':
-        speech.pitch = 0.9;     // Slightly lower pitch
-        speech.rate = 0.9;      // Slightly slower
-        speech.volume = 0.85;   // Softer voice
-        break;
-      case 'excited':
-        speech.pitch = 1.3;     // Higher pitch
-        speech.rate = 1.2;      // Faster speech
-        speech.volume = 1.0;    // Full volume
-        break;
-      case 'curious':
-        speech.pitch = 1.1;     // Slightly higher pitch
-        speech.rate = 1.0;      // Normal speed
-        speech.volume = 0.95;   // Normal volume
-        break;
-      default: // neutral
-        speech.pitch = 1.0;     // Normal pitch
-        speech.rate = 1.0;      // Normal speed
-        speech.volume = 0.9;    // Normal volume
+  const getStatusText = () => {
+    switch (status) {
+      case 'listening': return transcript || '🎙️ Listening...';
+      case 'processing': return '⏳ Processing...';
+      case 'speaking': return '🔊 Speaking...';
+      default: return 'Tap to speak';
     }
+  };
 
-    // Set language to Tamil
-    speech.lang = 'ta-IN';
-
-    return speech;
+  const getMicButtonStyle = () => {
+    if (status === 'listening') return 'bg-red-500 animate-pulse';
+    if (status === 'processing') return 'bg-yellow-500';
+    if (status === 'speaking') return 'bg-green-500';
+    return 'bg-gradient-to-r from-blue-500 to-purple-600';
   };
 
   return (
-    <div className={`min-h-screen italic ${isDarkMode ? "bg-gray-900" : "bg-white"} ${isDarkMode ? "text-white" : "text-gray-900"}`}>
-      <div className="flex flex-row">
-        <div className="w-1/2 flex items-center justify-center">
-          <div className="w-full max-w-md flex items-center justify-center">
-            <iframe
-              src="https://my.spline.design/avatarcopy-6a59820ff247b7a3c68fd762797be041/"
-              width={500}
-              height={500}
-              frameBorder={0}
-              className="mx-auto"
-              allowFullScreen
-            />
+    <div className={`min-h-screen flex flex-col items-center justify-center ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}>
+
+      {/* Main content - side by side */}
+      <div className="flex flex-row items-center justify-center gap-12 mb-8">
+
+        {/* LEFT: User Camera */}
+        <div className="flex flex-col items-center gap-3">
+          <div className={`rounded-2xl overflow-hidden shadow-xl ${isDarkMode ? "bg-gray-800" : "bg-white"}`}>
+            <div className="relative w-80 h-60">
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className={`w-full h-full object-cover ${isVideoEnabled ? 'block' : 'hidden'}`}
+                style={{ transform: 'scaleX(-1)' }}
+              />
+
+              {!isVideoEnabled && (
+                <div className="w-full h-full flex flex-col items-center justify-center gap-2">
+                  <FiVideoOff size={40} className={isDarkMode ? "text-gray-600" : "text-gray-400"} />
+                  <p className={`text-sm ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>Camera off</p>
+                </div>
+              )}
+
+              {isVideoEnabled && (
+                <div className={`absolute bottom-2 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-sm font-medium ${isDarkMode ? 'bg-gray-900/80 text-white' : 'bg-white/80 text-gray-900'}`}>
+                  {currentEmotion} {faceDetected && '●'}
+                </div>
+              )}
+            </div>
           </div>
+
+          {/* Camera toggle */}
+          <button
+            onClick={() => isVideoEnabled ? stopVideo() : startVideo()}
+            className={`px-4 py-2 rounded-xl font-medium flex items-center gap-2 transition-all ${isVideoEnabled
+              ? 'bg-green-500 text-white'
+              : isDarkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-700'
+              }`}
+          >
+            {isVideoEnabled ? <FiVideo size={18} /> : <FiVideoOff size={18} />}
+            {isVideoEnabled ? 'Camera On' : 'Enable Camera'}
+          </button>
         </div>
 
-        <div className="w-1/2 flex flex-col items-center justify-center p-6">
-          {error && (
-            <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md">
-              {error}
-            </div>
-          )}
+        {/* RIGHT: AI Avatar */}
+        <div className="flex flex-col items-center">
+          <TalkingAvatar
+            isSpeaking={status === 'speaking'}
+            isListening={status === 'listening'}
+            emotion={currentEmotion}
+            size={240}
+          />
+        </div>
+      </div>
 
-          {apiResponse && (
-            <div className="mb-8 bg-blue-50 rounded-2xl p-6 w-full max-w-md relative mx-auto shadow-lg">
-              <div className="absolute w-20 h-20 rounded-full bg-blue-50 -top-6 -left-2"></div>
-              <div className="absolute w-24 h-24 rounded-full bg-blue-50 -top-8 left-12"></div>
-              <div className="absolute w-20 h-20 rounded-full bg-blue-50 -top-6 left-32"></div>
-              <div className="absolute w-16 h-16 rounded-full bg-blue-50 -top-4 right-12"></div>
-              <div className="absolute w-12 h-12 rounded-full bg-blue-50 -top-2 right-2"></div>
-
-              <p className="text-gray-800 text-center font-medium z-10 relative pt-4">
-                {apiResponse}
-              </p>
-            </div>
-          )}
-
-          {!apiResponse && (
-            <div className="mb-8 bg-blue-50 rounded-2xl p-6 w-full max-w-md relative mx-auto shadow-lg">
-              <div className="absolute w-20 h-20 rounded-full bg-blue-50 -top-6 -left-2"></div>
-              <div className="absolute w-24 h-24 rounded-full bg-blue-50 -top-8 left-12"></div>
-              <div className="absolute w-20 h-20 rounded-full bg-blue-50 -top-6 left-32"></div>
-              <div className="absolute w-16 h-16 rounded-full bg-blue-50 -top-4 right-12"></div>
-              <div className="absolute w-12 h-12 rounded-full bg-blue-50 -top-2 right-2"></div>
-
-              <p className="text-gray-500 text-center font-medium z-10 relative pt-4">
-                Speak to start a conversation...
-              </p>
-            </div>
-          )}
-
-          <div className="mt-4">
-            <div
-              className={`flex items-center justify-center h-16 w-16 rounded-full cursor-pointer ${isClicked ? "bg-white text-blue-500" : "bg-blue-500 text-white"
-                } shadow-lg mx-auto transition-all duration-200 hover:scale-110`}
-              onClick={handleMicClick}
-            >
-              <RiMic2Line size={30} />
-            </div>
-            <p className={`mt-2 text-sm text-center ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
-              {isListening ? "Listening..." : "Click to speak"}
-            </p>
+      {/* Controls - centered below */}
+      <div className="flex flex-col items-center gap-4">
+        {/* Error */}
+        {error && (
+          <div className="p-3 rounded-xl bg-red-500/10 text-red-500 text-sm text-center max-w-sm">
+            {error}
           </div>
-          <div>
+        )}
 
-          </div>
+        {/* Mic Button */}
+        <button
+          onClick={handleMicClick}
+          className={`w-20 h-20 rounded-full flex items-center justify-center shadow-xl transition-all transform hover:scale-105 text-white ${getMicButtonStyle()}`}
+        >
+          {status !== 'idle' ? <RiStopCircleLine size={40} /> : <RiMic2Line size={40} />}
+        </button>
 
+        {/* Status text */}
+        <p className={`text-lg font-medium text-center max-w-md ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>
+          {getStatusText()}
+        </p>
 
+        {/* Conversation info & new convo button */}
+        <div className="flex items-center gap-4 mt-2">
+          {messageCount > 0 && (
+            <span className={`text-sm ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
+              {messageCount} message{messageCount !== 1 ? 's' : ''} in this session
+            </span>
+          )}
         </div>
       </div>
     </div>
