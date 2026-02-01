@@ -53,7 +53,7 @@ const Signup = () => {
       setCreatedUser(user);
       localStorage.setItem("Email", email);
       localStorage.setItem("Name", name);
-      setStep(2); // Move to personal details step
+      setStep(2); // Move to personal details ste
     } catch (err) {
       console.error("Signup error", err.message);
       alert(err.message);
