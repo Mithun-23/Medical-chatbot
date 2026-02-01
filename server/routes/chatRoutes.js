@@ -6,6 +6,7 @@ const Summary = require("../models/SummarizedHistory");
 const CheckIn = require("../models/CheckIn");
 const ArchivedChat = require("../models/ArchivedChat");
 const MedicalProfile = require("../models/MedicalProfile");
+const MedicalReport = require("../models/MedicalReport");
 
 const router = express.Router();
 
@@ -38,10 +39,49 @@ router.post('/chat', async (req, res) => {
             fullHealthContext += `. Fitness data: ${fitnessContext}`;
         }
 
+        // Fetch user's medical reports for context
+        let reportContext = "No medical reports uploaded";
+        if (userId) {
+            const reports = await MedicalReport.find({
+                userId,
+                analysisStatus: 'completed'
+            }).sort({ uploadedAt: -1 }).limit(3);
+
+            if (reports.length > 0) {
+                const reportContextParts = reports.map((report, index) => {
+                    let context = `Report ${index + 1} (${report.reportType}, ${new Date(report.uploadedAt).toLocaleDateString()}):`;
+
+                    if (report.analysis?.summary) {
+                        context += ` ${report.analysis.summary}`;
+                    }
+
+                    if (report.analysis?.findings?.length > 0) {
+                        const keyFindings = report.analysis.findings
+                            .filter(f => f.status !== 'normal' && f.status !== 'unknown')
+                            .map(f => `${f.name}: ${f.value} (${f.status})`)
+                            .slice(0, 3)
+                            .join(", ");
+                        if (keyFindings) {
+                            context += ` Key findings: ${keyFindings}.`;
+                        }
+                    }
+
+                    if (report.analysis?.concerns?.length > 0) {
+                        const concerns = report.analysis.concerns.map(c => c.concern).slice(0, 2).join(", ");
+                        context += ` Concerns: ${concerns}.`;
+                    }
+
+                    return context;
+                });
+                reportContext = reportContextParts.join(" ");
+            }
+        }
+
         // Pass to Python chatbot with comprehensive health context
         const chatResponse = await axios.post('http://localhost:5000/api/chat', {
             ...req.body,
-            healthContext: fullHealthContext
+            healthContext: fullHealthContext,
+            reportContext: reportContext
         });
         return res.status(200).json(chatResponse.data);
     } catch (error) {

@@ -12,6 +12,7 @@ import Dashboard from "./Components/Dashboard";
 import GameSelector from "./Components/GameSelector";
 import GamePage from "./Components/GamePage";
 import Profile from "./Components/Profile";
+import Health from "./Components/Health";
 import Music from "./Music";
 import Game from "./Components/Game";
 import { AuthProvider } from "./UserContext";
@@ -65,6 +66,7 @@ function App() {
           }>
             <Route path="/chatbot" element={<Chatbot />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/health" element={<Health />} />
             <Route path="/voice" element={<Voice />} />
             <Route path="/FitbitLogin" element={<FitbitLogin />} />
             <Route path="/callback" element={<FitbitCallback />} />

@@ -99,6 +99,9 @@ Always mention these INDIAN numbers, never US numbers like 911.
 === USER HEALTH PROFILE ===
 {health_context}
 
+=== USER MEDICAL REPORTS ===
+{report_context}
+
 === AVAILABLE GAMES (suggest when user needs stress relief/relaxation) ===
 IMPORTANT: Format ALL game links as markdown hyperlinks so they are clickable!
 Use this EXACT format: [Game Name](/game/X)
@@ -208,11 +211,13 @@ def chatbot():
         history_context = memory.load_memory_variables({}).get("history", "")
 
         # Prepare prompt with health context
+        report_context = data.get("reportContext", "No medical reports uploaded")
         prompt = PROMPT_TEMPLATE.format(
             history=history_context,
             user_input=user_message_english,
             emotion=emotion,
             health_context=health_context,
+            report_context=report_context,
         )
 
         # Call your LLM (replace with actual client call)
@@ -399,6 +404,145 @@ def handle_get_emotion():
         )
     else:
         emit("emotion_update", {"emotion": "Neutral"})
+
+
+# Medical Report Analysis Prompt
+REPORT_ANALYSIS_PROMPT = """
+You are an expert medical doctor with 20+ years of experience analyzing medical reports. Analyze this medical report thoroughly and professionally.
+
+Provide your analysis in the following JSON format ONLY (no other text):
+{
+    "summary": "Brief 2-3 sentence overview of the report",
+    "findings": [
+        {
+            "name": "Test/Parameter name",
+            "value": "Result value with units",
+            "normalRange": "Normal reference range",
+            "status": "normal|high|low|critical",
+            "interpretation": "What this means for the patient"
+        }
+    ],
+    "concerns": [
+        {
+            "concern": "Description of concern",
+            "severity": "low|moderate|high",
+            "recommendation": "What patient should do"
+        }
+    ],
+    "recommendations": [
+        "Actionable recommendation 1",
+        "Actionable recommendation 2"
+    ],
+    "doctorQuestions": [
+        "Question to ask their doctor 1",
+        "Question to ask their doctor 2"
+    ]
+}
+
+IMPORTANT:
+- Be thorough but clear
+- Flag any abnormal values
+- Provide actionable recommendations
+- Consider Indian medical context
+- If report is unclear, acknowledge limitations
+"""
+
+
+@app.route("/api/analyze-report", methods=["POST"])
+def analyze_report():
+    """Analyze a medical report using Groq Vision API"""
+    try:
+        data = request.json
+        file_base64 = data.get("file", "")
+        file_type = data.get("fileType", "")
+        file_name = data.get("fileName", "")
+        report_type = data.get("reportType", "other")
+
+        if not file_base64:
+            return jsonify({"error": "No file provided"}), 400
+
+        print(f"📄 Analyzing report: {file_name} (type: {report_type})")
+
+        # Prepare the message content based on file type
+        if file_type.startswith("image/"):
+            # For images, use vision capability
+            image_url = f"data:{file_type};base64,{file_base64}"
+            
+            response = client.chat.completions.create(
+                model="llama-3.2-90b-vision-preview",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": REPORT_ANALYSIS_PROMPT
+                    },
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": f"Please analyze this {report_type.replace('_', ' ')} medical report image and provide a detailed analysis."
+                            },
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": image_url
+                                }
+                            }
+                        ]
+                    }
+                ],
+                max_tokens=2000
+            )
+        else:
+            # For PDFs, use text-based analysis (PDF content should be extracted)
+            # Note: In production, you'd use pdf-parse or similar to extract text
+            response = client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": REPORT_ANALYSIS_PROMPT
+                    },
+                    {
+                        "role": "user",
+                        "content": f"Please analyze this {report_type.replace('_', ' ')} medical report. The file is a PDF named '{file_name}'. Please provide a general analysis template and note that the actual content extraction is needed for detailed analysis."
+                    }
+                ],
+                max_tokens=2000
+            )
+
+        analysis_text = response.choices[0].message.content.strip()
+        print(f"✅ Analysis received, length: {len(analysis_text)}")
+
+        # Try to parse as JSON, fallback to raw text
+        try:
+            # Clean up the response - remove markdown code blocks if present
+            cleaned_text = analysis_text
+            if "```json" in cleaned_text:
+                cleaned_text = cleaned_text.split("```json")[1].split("```")[0]
+            elif "```" in cleaned_text:
+                cleaned_text = cleaned_text.split("```")[1].split("```")[0]
+            
+            import json
+            analysis = json.loads(cleaned_text.strip())
+            analysis["rawAnalysis"] = analysis_text
+        except (json.JSONDecodeError, IndexError):
+            # If JSON parsing fails, return structured response with raw text
+            analysis = {
+                "summary": "Analysis completed. See raw analysis for details.",
+                "findings": [],
+                "concerns": [],
+                "recommendations": [],
+                "doctorQuestions": [],
+                "rawAnalysis": analysis_text
+            }
+
+        return jsonify(analysis)
+
+    except Exception as e:
+        print(f"❌ Report analysis error: {str(e)}")
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
 
 
 if __name__ == "__main__":

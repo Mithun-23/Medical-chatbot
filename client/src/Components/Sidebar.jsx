@@ -18,6 +18,7 @@ import { getAuth, signOut } from "firebase/auth";
 export default function Sidebar() {
   const { isDarkMode, setIsDarkMode } = useContext(ThemeContext);
   const [userInitial, setUserInitial] = useState(null);
+  const [userEmail, setUserEmail] = useState(null);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
@@ -26,6 +27,7 @@ export default function Sidebar() {
     const storedEmail = localStorage.getItem("Email");
     if (storedEmail && storedEmail.length > 0) {
       setUserInitial(storedEmail.charAt(0).toUpperCase());
+      setUserEmail(storedEmail);
     }
   }, []);
 
@@ -41,6 +43,7 @@ export default function Sidebar() {
       localStorage.removeItem("Name");
       localStorage.removeItem("userId");
       setUserInitial(null);
+      setUserEmail(null);
       navigate("/");
     } catch (error) {
       console.error("Logout error:", error);
@@ -65,7 +68,8 @@ export default function Sidebar() {
     { path: "/chatbot", icon: MessageSquare, label: "Chat" },
     { path: "/music", icon: Music, label: "Music" },
     { path: "/voice", icon: Mic, label: "Voice" },
-    { path: "/dashboard", icon: Activity, label: "Health" },
+    { path: "/health", icon: Activity, label: "My Health" },
+    { path: "/dashboard", icon: Activity, label: "Fitness" },
     { path: "/game-selector", icon: Gamepad2, label: "Games" },
   ];
 
@@ -132,7 +136,9 @@ export default function Sidebar() {
               ${isDarkMode ? "bg-gray-700" : "bg-blue-100"}`}>
               {userInitial}
             </div>
-            <span className="text-sm font-medium">Profile</span>
+            <span className="text-sm font-medium truncate max-w-[100px]" title={userEmail}>
+              {userEmail || "Profile"}
+            </span>
           </button>
         ) : (
           <button

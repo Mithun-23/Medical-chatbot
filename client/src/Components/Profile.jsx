@@ -6,28 +6,26 @@ import { auth } from "./Firebase";
 import { ThemeContext } from "./ThemeContext";
 import { axiosClient } from "../axios";
 import {
-  ChevronLeft, ChevronRight, Calendar, Plus, Save, Edit2,
-  Pill, Activity, Heart, User, X, Stethoscope,
-  Clock, TrendingUp, FileHeart, Brain
+  ChevronLeft, ChevronRight, Save, Edit2,
+  User, Phone, Calendar, Users, Scale, Ruler,
+  TrendingUp, Stethoscope, Heart
 } from "lucide-react";
 
 const Profile = () => {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-
-  // Profile form
   const [isEditing, setIsEditing] = useState(false);
+
+  // Personal details
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [dob, setDob] = useState("");
-
-  // Medical profile
-  const [conditions, setConditions] = useState([]);
-  const [medications, setMedications] = useState([]);
-  const [notes, setNotes] = useState("");
-  const [newCondition, setNewCondition] = useState("");
-  const [newMedication, setNewMedication] = useState({ name: "", dosage: "" });
+  const [emergencyContact, setEmergencyContact] = useState({ name: "", phone: "", relation: "" });
+  const [weight, setWeight] = useState("");
+  const [height, setHeight] = useState("");
+  const [bloodGroup, setBloodGroup] = useState("");
+  const [gender, setGender] = useState("");
 
   // Check-in
   const [checkInData, setCheckInData] = useState({
@@ -45,7 +43,7 @@ const Profile = () => {
   const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const dayNames = ["S", "M", "T", "W", "T", "F", "S"];
 
-  // Load user + medical profile
+  // Load user data
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
@@ -57,23 +55,14 @@ const Profile = () => {
         const userRef = doc(db, "users", currentUser.uid);
         const docSnap = await getDoc(userRef);
         if (docSnap.exists()) {
-          setPhone(docSnap.data().phone || "");
-          setDob(docSnap.data().dob || "");
-        }
-
-        // Medical profile
-        const userId = localStorage.getItem("Email");
-        if (userId) {
-          try {
-            const res = await axiosClient.get(`/api/medical-profile?userId=${encodeURIComponent(userId)}`);
-            if (res.data) {
-              setConditions(res.data.healthConditions || []);
-              setMedications(res.data.medications || []);
-              setNotes(res.data.notes || "");
-            }
-          } catch (err) {
-            console.error("Error fetching medical profile:", err);
-          }
+          const data = docSnap.data();
+          setPhone(data.phone || "");
+          setDob(data.dob || "");
+          setEmergencyContact(data.emergencyContact || { name: "", phone: "", relation: "" });
+          setWeight(data.weight || "");
+          setHeight(data.height || "");
+          setBloodGroup(data.bloodGroup || "");
+          setGender(data.gender || "");
         }
       }
       setIsLoading(false);
@@ -107,79 +96,27 @@ const Profile = () => {
     fetchChats();
   }, []);
 
-  // Save medical profile
-  const saveMedicalProfile = async () => {
-    const userId = localStorage.getItem("Email");
-    if (!userId) return;
-    try {
-      await axiosClient.post("/api/medical-profile", {
-        userId, healthConditions: conditions, medications, notes
-      });
-    } catch (err) {
-      console.error("Error saving:", err);
-    }
-  };
-
-  // Add condition
-  const addCondition = async () => {
-    if (!newCondition.trim()) return;
-    const userId = localStorage.getItem("Email");
-    try {
-      const res = await axiosClient.post("/api/medical-profile/condition", {
-        userId, condition: newCondition.trim()
-      });
-      setConditions(res.data.healthConditions);
-      setNewCondition("");
-    } catch (err) { }
-  };
-
-  // Remove condition
-  const removeCondition = async (id) => {
-    const userId = localStorage.getItem("Email");
-    try {
-      const res = await axiosClient.delete("/api/medical-profile/condition", {
-        data: { userId, conditionId: id }
-      });
-      setConditions(res.data.healthConditions);
-    } catch (err) { }
-  };
-
-  // Add medication
-  const addMedication = async () => {
-    if (!newMedication.name.trim()) return;
-    const userId = localStorage.getItem("Email");
-    try {
-      const res = await axiosClient.post("/api/medical-profile/medication", {
-        userId, name: newMedication.name.trim(), dosage: newMedication.dosage.trim()
-      });
-      setMedications(res.data.medications);
-      setNewMedication({ name: "", dosage: "" });
-    } catch (err) {
-      console.error("Error adding medication:", err);
-    }
-  };
-
-  // Remove medication
-  const removeMedication = async (id) => {
-    const userId = localStorage.getItem("Email");
-    try {
-      const res = await axiosClient.delete("/api/medical-profile/medication", {
-        data: { userId, medicationId: id }
-      });
-      setMedications(res.data.medications);
-    } catch (err) {
-      console.error("Error removing medication:", err);
-    }
-  };
-
   // Save profile
   const handleSave = async () => {
     if (!auth.currentUser) return;
     await updateProfile(auth.currentUser, { displayName: name });
     const userRef = doc(db, "users", auth.currentUser.uid);
-    await setDoc(userRef, { phone, dob }, { merge: true });
-    await saveMedicalProfile();
+    await setDoc(userRef, {
+      phone, dob, emergencyContact, weight, height, bloodGroup, gender
+    }, { merge: true });
     setIsEditing(false);
+  };
+
+  // Calculate age from DOB
+  const calculateAge = () => {
+    if (!dob) return "";
+    const birth = new Date(dob);
+    const now = new Date();
+    let age = now.getFullYear() - birth.getFullYear();
+    if (now.getMonth() < birth.getMonth() || (now.getMonth() === birth.getMonth() && now.getDate() < birth.getDate())) {
+      age--;
+    }
+    return age;
   };
 
   // Calendar helpers
@@ -202,130 +139,272 @@ const Profile = () => {
     return day === t.getDate() && currentMonth === t.getMonth() && currentYear === t.getFullYear();
   };
 
+  if (isLoading) {
+    return (
+      <div className={`min-h-screen flex items-center justify-center ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}>
+        <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full"></div>
+      </div>
+    );
+  }
+
   return (
-    <div className={`min-h-screen ${isDarkMode ? "bg-gray-900" : "bg-white"}`}>
+    <div className={`min-h-screen ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}>
 
       {/* Header */}
       <div className="p-6 pb-2">
-        <div className="flex items-center gap-4">
-          <div className={`w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-3xl font-bold shadow-lg`}>
-            {name.charAt(0).toUpperCase() || "?"}
-          </div>
-          <div>
-            <h1 className={`text-2xl font-bold ${isDarkMode ? "text-white" : "text-gray-900"}`}>
-              {name || "Guest"}
-            </h1>
-            <p className={`${isDarkMode ? "text-purple-300" : "text-purple-600"}`}>{email}</p>
-            <div className="flex items-center gap-2 mt-1">
-              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${isDarkMode ? "bg-green-900 text-green-300" : "bg-green-100 text-green-700"}`}>
-                🔥 {checkInData.currentStreak} day streak
-              </span>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className={`w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-3xl font-bold shadow-lg`}>
+              {name.charAt(0).toUpperCase() || "?"}
+            </div>
+            <div>
+              <h1 className={`text-2xl font-bold ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+                {name || "Guest"}
+              </h1>
+              <p className={`${isDarkMode ? "text-purple-300" : "text-purple-600"}`}>{email}</p>
+              <div className="flex items-center gap-2 mt-1">
+                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${isDarkMode ? "bg-green-900 text-green-300" : "bg-green-100 text-green-700"}`}>
+                  🔥 {checkInData.currentStreak} day streak
+                </span>
+                {calculateAge() && (
+                  <span className={`px-2 py-0.5 rounded-full text-xs ${isDarkMode ? "bg-gray-700 text-gray-300" : "bg-gray-200 text-gray-700"}`}>
+                    {calculateAge()} years
+                  </span>
+                )}
+              </div>
             </div>
           </div>
+          <button
+            onClick={() => isEditing ? handleSave() : setIsEditing(true)}
+            className={`px-4 py-2 rounded-xl font-medium flex items-center gap-2 transition-all
+              ${isEditing
+                ? "bg-gradient-to-r from-green-500 to-emerald-600 text-white"
+                : isDarkMode
+                  ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
+          >
+            {isEditing ? <><Save className="w-4 h-4" /> Save</> : <><Edit2 className="w-4 h-4" /> Edit</>}
+          </button>
         </div>
       </div>
 
       <div className="p-6 pt-4 grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-        {/* Left Column - Health Info */}
+        {/* Left Column - Personal Details */}
         <div className="lg:col-span-2 space-y-6">
 
-          {/* Health Conditions - Main Card */}
-          <div className={`rounded-2xl p-6 shadow-xl ${isDarkMode ? "bg-slate-800/60 backdrop-blur-sm border border-purple-500/20" : "bg-white/80 backdrop-blur-sm border border-purple-200"}`}>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className={`text-xl font-bold flex items-center gap-2 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
-                <Heart className="w-5 h-5 text-red-400" />
-                My Health Conditions
-              </h2>
-              <span className={`text-sm ${isDarkMode ? "text-purple-300" : "text-purple-600"}`}>
-                Chatbot will remember these
-              </span>
-            </div>
+          {/* Basic Info Card */}
+          <div className={`rounded-2xl p-6 shadow-xl ${isDarkMode ? "bg-slate-800/60 backdrop-blur-sm border border-blue-500/20" : "bg-white/80 backdrop-blur-sm border border-blue-200"}`}>
+            <h2 className={`text-lg font-bold flex items-center gap-2 mb-4 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+              <User className="w-5 h-5 text-blue-400" />
+              Personal Information
+            </h2>
 
-            <div className="flex gap-2 mb-4">
-              <input
-                value={newCondition}
-                onChange={(e) => setNewCondition(e.target.value)}
-                onKeyPress={(e) => e.key === "Enter" && addCondition()}
-                placeholder="Type condition (e.g., Diabetes, Asthma)"
-                className={`flex-1 px-4 py-3 rounded-xl outline-none ${isDarkMode ? "bg-slate-700 text-white placeholder-gray-400 border border-purple-500/30" : "bg-gray-100 text-gray-900 border border-purple-200"}`}
-              />
-              <button onClick={addCondition} className="px-5 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-xl font-medium hover:opacity-90 transition flex items-center gap-2">
-                <Plus className="w-4 h-4" /> Add
-              </button>
-            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Name */}
+              <div>
+                <label className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>Full Name</label>
+                {isEditing ? (
+                  <input
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className={`w-full px-4 py-3 rounded-xl mt-1 ${isDarkMode ? "bg-slate-700 text-white" : "bg-gray-100"}`}
+                  />
+                ) : (
+                  <p className={`mt-1 font-medium ${isDarkMode ? "text-white" : "text-gray-900"}`}>{name || "-"}</p>
+                )}
+              </div>
 
-            <div className="flex flex-wrap gap-2">
-              {conditions.length > 0 ? conditions.map((c, i) => (
-                <span key={c._id || i} className={`group px-4 py-2 rounded-full flex items-center gap-2 ${isDarkMode ? "bg-purple-900/50 text-purple-200" : "bg-purple-100 text-purple-700"}`}>
-                  <Activity className="w-4 h-4" />
-                  {c.condition}
-                  <button onClick={() => removeCondition(c._id)} className="opacity-0 group-hover:opacity-100 transition">
-                    <X className="w-4 h-4 text-red-400" />
-                  </button>
-                </span>
-              )) : (
-                <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>No conditions added. Add your health conditions so Dr.Chat can provide personalized support.</p>
-              )}
+              {/* Phone */}
+              <div>
+                <label className={`text-sm flex items-center gap-1 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+                  <Phone className="w-3 h-3" /> Phone Number
+                </label>
+                {isEditing ? (
+                  <input
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="+91 XXXXXXXXXX"
+                    className={`w-full px-4 py-3 rounded-xl mt-1 ${isDarkMode ? "bg-slate-700 text-white" : "bg-gray-100"}`}
+                  />
+                ) : (
+                  <p className={`mt-1 font-medium ${isDarkMode ? "text-white" : "text-gray-900"}`}>{phone || "-"}</p>
+                )}
+              </div>
+
+              {/* DOB */}
+              <div>
+                <label className={`text-sm flex items-center gap-1 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+                  <Calendar className="w-3 h-3" /> Date of Birth
+                </label>
+                {isEditing ? (
+                  <input
+                    type="date"
+                    value={dob}
+                    onChange={(e) => setDob(e.target.value)}
+                    className={`w-full px-4 py-3 rounded-xl mt-1 ${isDarkMode ? "bg-slate-700 text-white" : "bg-gray-100"}`}
+                  />
+                ) : (
+                  <p className={`mt-1 font-medium ${isDarkMode ? "text-white" : "text-gray-900"}`}>{dob || "-"}</p>
+                )}
+              </div>
+
+              {/* Gender */}
+              <div>
+                <label className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>Gender</label>
+                {isEditing ? (
+                  <select
+                    value={gender}
+                    onChange={(e) => setGender(e.target.value)}
+                    className={`w-full px-4 py-3 rounded-xl mt-1 ${isDarkMode ? "bg-slate-700 text-white" : "bg-gray-100"}`}
+                  >
+                    <option value="">Select</option>
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                    <option value="other">Other</option>
+                  </select>
+                ) : (
+                  <p className={`mt-1 font-medium capitalize ${isDarkMode ? "text-white" : "text-gray-900"}`}>{gender || "-"}</p>
+                )}
+              </div>
+
+              {/* Blood Group */}
+              <div>
+                <label className={`text-sm flex items-center gap-1 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+                  <Heart className="w-3 h-3" /> Blood Group
+                </label>
+                {isEditing ? (
+                  <select
+                    value={bloodGroup}
+                    onChange={(e) => setBloodGroup(e.target.value)}
+                    className={`w-full px-4 py-3 rounded-xl mt-1 ${isDarkMode ? "bg-slate-700 text-white" : "bg-gray-100"}`}
+                  >
+                    <option value="">Select</option>
+                    <option value="A+">A+</option>
+                    <option value="A-">A-</option>
+                    <option value="B+">B+</option>
+                    <option value="B-">B-</option>
+                    <option value="AB+">AB+</option>
+                    <option value="AB-">AB-</option>
+                    <option value="O+">O+</option>
+                    <option value="O-">O-</option>
+                  </select>
+                ) : (
+                  <p className={`mt-1 font-medium ${isDarkMode ? "text-white" : "text-gray-900"}`}>{bloodGroup || "-"}</p>
+                )}
+              </div>
             </div>
           </div>
 
-          {/* Medications */}
-          <div className={`rounded-2xl p-5 shadow-lg ${isDarkMode ? "bg-slate-800/60 backdrop-blur-sm border border-blue-500/20" : "bg-white/80 backdrop-blur-sm border border-blue-200"}`}>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className={`font-bold flex items-center gap-2 ${isDarkMode ? "text-blue-300" : "text-blue-700"}`}>
-                <Pill className="w-4 h-4" /> Medications
-              </h3>
-              <span className={`text-sm ${isDarkMode ? "text-purple-300" : "text-purple-600"}`}>
-                Chatbot will remember these
-              </span>
+          {/* Physical Stats */}
+          <div className={`rounded-2xl p-6 shadow-xl ${isDarkMode ? "bg-slate-800/60 backdrop-blur-sm border border-green-500/20" : "bg-white/80 backdrop-blur-sm border border-green-200"}`}>
+            <h2 className={`text-lg font-bold flex items-center gap-2 mb-4 ${isDarkMode ? "text-green-300" : "text-green-700"}`}>
+              <Scale className="w-5 h-5" />
+              Physical Stats
+            </h2>
+
+            <div className="grid grid-cols-2 gap-4">
+              {/* Weight */}
+              <div>
+                <label className={`text-sm flex items-center gap-1 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+                  <Scale className="w-3 h-3" /> Weight (kg)
+                </label>
+                {isEditing ? (
+                  <input
+                    type="number"
+                    value={weight}
+                    onChange={(e) => setWeight(e.target.value)}
+                    placeholder="65"
+                    className={`w-full px-4 py-3 rounded-xl mt-1 ${isDarkMode ? "bg-slate-700 text-white" : "bg-gray-100"}`}
+                  />
+                ) : (
+                  <p className={`mt-1 text-2xl font-bold ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+                    {weight ? `${weight} kg` : "-"}
+                  </p>
+                )}
+              </div>
+
+              {/* Height */}
+              <div>
+                <label className={`text-sm flex items-center gap-1 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+                  <Ruler className="w-3 h-3" /> Height (cm)
+                </label>
+                {isEditing ? (
+                  <input
+                    type="number"
+                    value={height}
+                    onChange={(e) => setHeight(e.target.value)}
+                    placeholder="170"
+                    className={`w-full px-4 py-3 rounded-xl mt-1 ${isDarkMode ? "bg-slate-700 text-white" : "bg-gray-100"}`}
+                  />
+                ) : (
+                  <p className={`mt-1 text-2xl font-bold ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+                    {height ? `${height} cm` : "-"}
+                  </p>
+                )}
+              </div>
             </div>
-            <div className="flex gap-2 mb-3">
-              <input
-                value={newMedication.name}
-                onChange={(e) => setNewMedication({ ...newMedication, name: e.target.value })}
-                placeholder="Medication name"
-                className={`flex-1 px-3 py-2 rounded-lg text-sm ${isDarkMode ? "bg-slate-700 text-white" : "bg-gray-100"}`}
-              />
-              <input
-                value={newMedication.dosage}
-                onChange={(e) => setNewMedication({ ...newMedication, dosage: e.target.value })}
-                placeholder="Dosage"
-                className={`w-24 px-3 py-2 rounded-lg text-sm ${isDarkMode ? "bg-slate-700 text-white" : "bg-gray-100"}`}
-              />
-              <button onClick={addMedication} className="px-4 py-2 bg-blue-500 text-white rounded-lg flex items-center gap-2">
-                <Plus className="w-4 h-4" /> Add
-              </button>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {medications.length > 0 ? medications.map((m, i) => (
-                <span key={m._id || i} className={`group px-4 py-2 rounded-full flex items-center gap-2 ${isDarkMode ? "bg-blue-900/50 text-blue-200" : "bg-blue-100 text-blue-700"}`}>
-                  <Pill className="w-4 h-4" />
-                  {m.name} {m.dosage && <span className="opacity-60">({m.dosage})</span>}
-                  <button onClick={() => removeMedication(m._id)} className="opacity-0 group-hover:opacity-100 transition">
-                    <X className="w-4 h-4 text-red-400" />
-                  </button>
-                </span>
-              )) : (
-                <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>No medications added. Add your current medications so Dr.Chat can provide better advice.</p>
-              )}
-            </div>
+
+            {/* BMI Display */}
+            {weight && height && (
+              <div className={`mt-4 p-4 rounded-xl ${isDarkMode ? "bg-slate-700" : "bg-gray-100"}`}>
+                <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>Body Mass Index (BMI)</p>
+                <p className={`text-2xl font-bold ${isDarkMode ? "text-green-400" : "text-green-600"}`}>
+                  {(weight / ((height / 100) ** 2)).toFixed(1)}
+                </p>
+              </div>
+            )}
           </div>
 
-          {/* Notes + Save */}
-          <div className={`rounded-2xl p-5 shadow-lg ${isDarkMode ? "bg-slate-800/60 backdrop-blur-sm border border-green-500/20" : "bg-white/80 backdrop-blur-sm border border-green-200"}`}>
-            <h3 className={`font-bold flex items-center gap-2 mb-3 ${isDarkMode ? "text-green-300" : "text-green-700"}`}>
-              <Brain className="w-4 h-4" /> Additional Notes for Dr.Chat
-            </h3>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Any other health info the chatbot should know about..."
-              className={`w-full px-4 py-3 rounded-xl text-sm h-20 resize-none ${isDarkMode ? "bg-slate-700 text-white" : "bg-gray-100"}`}
-            />
-            <button onClick={saveMedicalProfile} className="mt-3 px-6 py-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl font-medium flex items-center gap-2">
-              <Save className="w-4 h-4" /> Save Health Profile
-            </button>
+          {/* Emergency Contact */}
+          <div className={`rounded-2xl p-6 shadow-xl ${isDarkMode ? "bg-slate-800/60 backdrop-blur-sm border border-red-500/20" : "bg-white/80 backdrop-blur-sm border border-red-200"}`}>
+            <h2 className={`text-lg font-bold flex items-center gap-2 mb-4 ${isDarkMode ? "text-red-300" : "text-red-700"}`}>
+              <Users className="w-5 h-5" />
+              Emergency Contact
+            </h2>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>Name</label>
+                {isEditing ? (
+                  <input
+                    value={emergencyContact.name}
+                    onChange={(e) => setEmergencyContact({ ...emergencyContact, name: e.target.value })}
+                    placeholder="Contact name"
+                    className={`w-full px-4 py-3 rounded-xl mt-1 ${isDarkMode ? "bg-slate-700 text-white" : "bg-gray-100"}`}
+                  />
+                ) : (
+                  <p className={`mt-1 font-medium ${isDarkMode ? "text-white" : "text-gray-900"}`}>{emergencyContact.name || "-"}</p>
+                )}
+              </div>
+              <div>
+                <label className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>Phone</label>
+                {isEditing ? (
+                  <input
+                    value={emergencyContact.phone}
+                    onChange={(e) => setEmergencyContact({ ...emergencyContact, phone: e.target.value })}
+                    placeholder="+91 XXXXXXXXXX"
+                    className={`w-full px-4 py-3 rounded-xl mt-1 ${isDarkMode ? "bg-slate-700 text-white" : "bg-gray-100"}`}
+                  />
+                ) : (
+                  <p className={`mt-1 font-medium ${isDarkMode ? "text-white" : "text-gray-900"}`}>{emergencyContact.phone || "-"}</p>
+                )}
+              </div>
+              <div>
+                <label className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>Relation</label>
+                {isEditing ? (
+                  <input
+                    value={emergencyContact.relation}
+                    onChange={(e) => setEmergencyContact({ ...emergencyContact, relation: e.target.value })}
+                    placeholder="e.g., Mother, Spouse"
+                    className={`w-full px-4 py-3 rounded-xl mt-1 ${isDarkMode ? "bg-slate-700 text-white" : "bg-gray-100"}`}
+                  />
+                ) : (
+                  <p className={`mt-1 font-medium ${isDarkMode ? "text-white" : "text-gray-900"}`}>{emergencyContact.relation || "-"}</p>
+                )}
+              </div>
+            </div>
           </div>
         </div>
 
