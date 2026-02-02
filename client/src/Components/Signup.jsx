@@ -108,7 +108,7 @@ const Signup = () => {
     }
   };
 
-  // GitHub Signup
+  // GitHub Signu
   const handleGithubSignup = async () => {
     try {
       const result = await signInWithPopup(auth, GithubProvider);
