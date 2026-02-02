@@ -1,92 +1,228 @@
 import React, { useState, useEffect, useContext, useRef, useCallback } from "react";
-import { RiMic2Line, RiStopCircleLine } from "react-icons/ri";
-import { FiVideo, FiVideoOff } from "react-icons/fi";
+import { RiMic2Line, RiStopCircleLine, RiSendPlane2Fill } from "react-icons/ri";
+import { FiVideo, FiVideoOff, FiVolume2 } from "react-icons/fi";
 import { ThemeContext } from "./ThemeContext";
-import { axiosClient } from "../axios";
+import axios from "axios";
 import { io } from 'socket.io-client';
-import TalkingAvatar from './TalkingAvatar';
 
 const PYTHON_SERVER_URL = 'http://localhost:5000';
+const NODE_SERVER_URL = 'http://localhost:8000';
+
+// Simple AI Avatar Component
+const AIAvatar = ({ isSpeaking, isListening, size = 280 }) => {
+  const [mouthFrame, setMouthFrame] = useState(0);
+  const [blinkState, setBlinkState] = useState(false);
+
+  useEffect(() => {
+    if (!isSpeaking) {
+      setMouthFrame(0);
+      return;
+    }
+    const interval = setInterval(() => {
+      setMouthFrame(prev => (prev + 1) % 4);
+    }, 120);
+    return () => clearInterval(interval);
+  }, [isSpeaking]);
+
+  useEffect(() => {
+    const blinkInterval = setInterval(() => {
+      setBlinkState(true);
+      setTimeout(() => setBlinkState(false), 150);
+    }, 3000 + Math.random() * 2000);
+    return () => clearInterval(blinkInterval);
+  }, []);
+
+  const accentColor = isSpeaking ? '#10b981' : isListening ? '#ef4444' : '#6366f1';
+
+  return (
+    <div className="relative flex flex-col items-center" style={{ width: size, height: size + 50 }}>
+      {/* Glow */}
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div
+          className={`absolute rounded-full transition-all duration-500 ${isSpeaking || isListening ? 'animate-pulse' : ''}`}
+          style={{
+            width: size + 40,
+            height: size + 40,
+            background: `radial-gradient(circle, ${accentColor}40 0%, transparent 70%)`,
+          }}
+        />
+      </div>
+
+      {/* Avatar */}
+      <div
+        className="relative rounded-full overflow-hidden shadow-2xl bg-gradient-to-br from-blue-500 to-purple-600 transition-transform duration-300"
+        style={{
+          width: size,
+          height: size,
+          transform: isSpeaking ? 'scale(1.03)' : 'scale(1)',
+          boxShadow: `0 0 40px ${accentColor}50`,
+        }}
+      >
+        <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full">
+          {/* Hair */}
+          <ellipse cx="50" cy="25" rx="42" ry="20" fill="#2d1f3d" />
+          <ellipse cx="50" cy="35" rx="45" ry="25" fill="#3d2b52" />
+
+          {/* Face */}
+          <ellipse cx="50" cy="52" rx="32" ry="36" fill="#fce7d6" />
+          <ellipse cx="50" cy="55" rx="30" ry="33" fill="#fdd8c4" />
+
+          {/* Blush */}
+          <ellipse cx="30" cy="55" rx="8" ry="4" fill="#ffb8b8" opacity="0.5" />
+          <ellipse cx="70" cy="55" rx="8" ry="4" fill="#ffb8b8" opacity="0.5" />
+
+          {/* Eyes */}
+          <ellipse cx="38" cy="48" rx="7" ry={blinkState ? 1 : 8} fill="white" />
+          <ellipse cx="38" cy={blinkState ? 48 : 49} rx="5" ry={blinkState ? 0.5 : 6} fill="#4a3366" />
+          {!blinkState && <ellipse cx="40" cy="47" rx="1.5" ry="1.5" fill="white" />}
+
+          <ellipse cx="62" cy="48" rx="7" ry={blinkState ? 1 : 8} fill="white" />
+          <ellipse cx="62" cy={blinkState ? 48 : 49} rx="5" ry={blinkState ? 0.5 : 6} fill="#4a3366" />
+          {!blinkState && <ellipse cx="64" cy="47" rx="1.5" ry="1.5" fill="white" />}
+
+          {/* Eyebrows */}
+          <path d="M 30 40 Q 38 37 46 40" stroke="#3d2b52" strokeWidth="1.5" fill="none" />
+          <path d="M 54 40 Q 62 37 70 40" stroke="#3d2b52" strokeWidth="1.5" fill="none" />
+
+          {/* Mouth */}
+          {isSpeaking ? (
+            <ellipse cx="50" cy="70" rx={[6, 8, 4, 7][mouthFrame]} ry={[4, 6, 2, 5][mouthFrame]} fill="#d35d6e" />
+          ) : (
+            <path d="M 42 68 Q 50 74 58 68" stroke="#d35d6e" strokeWidth="2" fill="none" strokeLinecap="round" />
+          )}
+
+          {/* Hair strands */}
+          <path d="M 15 30 Q 20 45 22 55" stroke="#3d2b52" strokeWidth="6" fill="none" />
+          <path d="M 85 30 Q 80 45 78 55" stroke="#3d2b52" strokeWidth="6" fill="none" />
+          <path d="M 30 15 Q 50 5 70 15" stroke="#3d2b52" strokeWidth="8" fill="none" strokeLinecap="round" />
+
+          {/* Headphone */}
+          <path d="M 18 45 Q 10 45 10 55 Q 10 65 18 65" stroke={accentColor} strokeWidth="3" fill="none" />
+          <path d="M 82 45 Q 90 45 90 55 Q 90 65 82 65" stroke={accentColor} strokeWidth="3" fill="none" />
+          <ellipse cx="15" cy="55" rx="5" ry="8" fill={accentColor} />
+          <ellipse cx="85" cy="55" rx="5" ry="8" fill={accentColor} />
+          <path d="M 15 35 Q 15 15 50 12 Q 85 15 85 35" stroke={accentColor} strokeWidth="4" fill="none" />
+        </svg>
+        <div className="absolute top-4 left-6 w-1/4 h-1/6 rounded-full bg-white/20 blur-sm" />
+      </div>
+
+      {/* Status */}
+      <div
+        className="mt-4 px-5 py-2 rounded-full text-sm font-semibold shadow-lg"
+        style={{
+          background: `${accentColor}20`,
+          color: accentColor,
+          border: `1px solid ${accentColor}50`,
+        }}
+      >
+        {isSpeaking ? '🎙️ Dr. Aria is speaking...' : isListening ? '👂 Listening...' : 'Hi, I\'m Dr. Aria!'}
+      </div>
+    </div>
+  );
+};
+
+// Chat Bubble
+const ChatBubble = ({ text, isUser, isDarkMode }) => (
+  <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} w-full mb-3`}>
+    <div className={`max-w-xs px-4 py-3 rounded-2xl shadow-lg ${isUser
+        ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-br-sm'
+        : isDarkMode ? 'bg-gray-700 text-gray-100 rounded-bl-sm' : 'bg-white text-gray-800 rounded-bl-sm border border-gray-200'
+      }`}>
+      <p className="text-sm">{text}</p>
+    </div>
+  </div>
+);
 
 export default function Voice() {
   const { isDarkMode } = useContext(ThemeContext);
+  const [status, setStatus] = useState('idle'); // idle, listening, processing, speaking
   const [error, setError] = useState(null);
-  const [status, setStatus] = useState('idle'); // 'idle' | 'listening' | 'processing' | 'speaking'
-  const [transcript, setTranscript] = useState('');
-  const [voiceSessionId, setVoiceSessionId] = useState(() => {
-    // Get existing session or create new one
-    const stored = localStorage.getItem('voiceSessionId');
-    if (stored) return stored;
-    const newId = `voice-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    localStorage.setItem('voiceSessionId', newId);
-    return newId;
-  });
-  const [messageCount, setMessageCount] = useState(0);
+  const [messages, setMessages] = useState([]);
+  const [textInput, setTextInput] = useState('');
+  const [currentTranscript, setCurrentTranscript] = useState('');
 
-  // Video & emotion state
-  const [isVideoEnabled, setIsVideoEnabled] = useState(false);
-  const [isConnected, setIsConnected] = useState(false);
-  const [currentEmotion, setCurrentEmotion] = useState('Neutral');
-  const [faceDetected, setFaceDetected] = useState(false);
+  // Video state
+  const [isVideoOn, setIsVideoOn] = useState(false);
+  const [emotion, setEmotion] = useState('Neutral');
+  const [hasFace, setHasFace] = useState(false);
+  const [socketConnected, setSocketConnected] = useState(false);
 
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const canvasRef = useRef(null);
   const socketRef = useRef(null);
-  const frameIntervalRef = useRef(null);
+  const frameLoopRef = useRef(null);
   const recognitionRef = useRef(null);
-  const speechRef = useRef(null);
-  const keepAliveRef = useRef(null);
+  const messagesEndRef = useRef(null);
 
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const sessionId = useRef(`voice-${Date.now()}`).current;
+  const userId = localStorage.getItem('Email') || 'guest';
 
-  // Initialize Socket.IO connection for emotion detection
+  // Scroll to bottom of messages
   useEffect(() => {
-    socketRef.current = io(PYTHON_SERVER_URL, {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  // Initialize Socket.IO
+  useEffect(() => {
+    console.log('Connecting to socket...');
+    const socket = io(PYTHON_SERVER_URL, {
       transports: ['polling', 'websocket'],
-      reconnectionAttempts: 3,
+      reconnection: true,
+      timeout: 10000,
     });
 
-    socketRef.current.on('connect', () => {
-      console.log('✅ Connected to emotion server');
-      setIsConnected(true);
+    socket.on('connect', () => {
+      console.log('✅ Socket connected!', socket.id);
+      setSocketConnected(true);
     });
 
-    socketRef.current.on('disconnect', () => {
-      setIsConnected(false);
+    socket.on('disconnect', () => {
+      console.log('❌ Socket disconnected');
+      setSocketConnected(false);
     });
 
-    socketRef.current.on('emotion_update', (data) => {
-      if (data.emotion) setCurrentEmotion(data.emotion);
-      if (typeof data.face_detected === 'boolean') setFaceDetected(data.face_detected);
+    socket.on('connect_error', (err) => {
+      console.error('Socket error:', err);
+      setSocketConnected(false);
     });
+
+    socket.on('emotion_update', (data) => {
+      console.log('Emotion update:', data);
+      if (data.emotion) setEmotion(data.emotion);
+      if (data.face_detected !== undefined) setHasFace(data.face_detected);
+    });
+
+    socketRef.current = socket;
 
     return () => {
-      if (socketRef.current) socketRef.current.disconnect();
+      socket.disconnect();
     };
   }, []);
 
-  // Capture video frame for emotion detection
-  const captureFrame = useCallback(() => {
+  // Capture and send video frames
+  const sendFrame = useCallback(() => {
     if (!videoRef.current || !canvasRef.current || !socketRef.current?.connected) return;
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
+
+    if (video.readyState < 2) return; // Video not ready
+
+    canvas.width = 320;
+    canvas.height = 240;
     const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0, 320, 240);
 
-    canvas.width = video.videoWidth || 320;
-    canvas.height = video.videoHeight || 240;
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-    const frameData = canvas.toDataURL('image/jpeg', 0.5);
+    const frameData = canvas.toDataURL('image/jpeg', 0.6);
     socketRef.current.emit('video_frame', { frame: frameData });
   }, []);
 
   // Start video
-  const startVideo = useCallback(async () => {
+  const startVideo = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 320 }, height: { ideal: 240 }, facingMode: 'user' },
+        video: { width: 320, height: 240, facingMode: 'user' },
         audio: false
       });
 
@@ -100,342 +236,332 @@ export default function Voice() {
         canvasRef.current = document.createElement('canvas');
       }
 
-      frameIntervalRef.current = setInterval(captureFrame, 50);
-      setIsVideoEnabled(true);
+      // Start sending frames
+      frameLoopRef.current = setInterval(sendFrame, 100);
+      setIsVideoOn(true);
       setError(null);
+      console.log('Camera started');
     } catch (err) {
-      setError(err.name === 'NotAllowedError' ? 'Camera permission denied' : `Camera error: ${err.message}`);
+      console.error('Camera error:', err);
+      setError('Camera permission denied');
     }
-  }, [captureFrame]);
+  };
 
   // Stop video
-  const stopVideo = useCallback(() => {
-    if (frameIntervalRef.current) {
-      clearInterval(frameIntervalRef.current);
-      frameIntervalRef.current = null;
+  const stopVideo = () => {
+    if (frameLoopRef.current) {
+      clearInterval(frameLoopRef.current);
+      frameLoopRef.current = null;
     }
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current.getTracks().forEach(t => t.stop());
       streamRef.current = null;
     }
-    if (videoRef.current) videoRef.current.srcObject = null;
-    setIsVideoEnabled(false);
-  }, []);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      stopVideo();
-      stopEverything();
-    };
-  }, [stopVideo]);
-
-  // Stop all speech/recognition
-  const stopEverything = useCallback(() => {
-    // Stop speech synthesis
-    if (window.speechSynthesis) {
-      window.speechSynthesis.cancel();
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
     }
-    if (keepAliveRef.current) {
-      clearInterval(keepAliveRef.current);
-      keepAliveRef.current = null;
+    setIsVideoOn(false);
+    setHasFace(false);
+  };
+
+  // Send message to API
+  const sendMessage = async (text) => {
+    if (!text.trim()) return;
+
+    setStatus('processing');
+    setMessages(prev => [...prev, { text, isUser: true }]);
+    setCurrentTranscript('');
+
+    try {
+      const response = await axios.post(`${NODE_SERVER_URL}/api/chat`, {
+        userId,
+        message: text,
+        sessionId,
+        emotion: hasFace ? emotion : 'Neutral'
+      });
+
+      const aiText = response.data.response;
+      setMessages(prev => [...prev, { text: aiText, isUser: false }]);
+      speakText(aiText);
+    } catch (err) {
+      console.error('API error:', err);
+      setError('Failed to get response. Check if server is running.');
+      setStatus('idle');
     }
+  };
 
-    // Stop recognition
-    if (recognitionRef.current) {
-      try {
-        recognitionRef.current.abort();
-      } catch (e) { }
-    }
-
-    setStatus('idle');
-    setTranscript('');
-  }, []);
-
-  // Start listening
-  const startListening = useCallback(() => {
-    if (!SpeechRecognition) {
-      setError('Speech recognition not supported');
+  // Speak text using Web Speech API
+  const speakText = (text) => {
+    if (!window.speechSynthesis) {
+      setError('Speech not supported');
+      setStatus('idle');
       return;
     }
 
-    // Stop any ongoing speech first
-    stopEverything();
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+
+    // Try to get a nice voice
+    const voices = window.speechSynthesis.getVoices();
+    const preferredVoice = voices.find(v => v.name.includes('Samantha') || v.name.includes('Female'))
+      || voices.find(v => v.lang.includes('en'))
+      || voices[0];
+
+    if (preferredVoice) utterance.voice = preferredVoice;
+    utterance.rate = 0.95;
+    utterance.pitch = 1.1;
+
+    utterance.onstart = () => setStatus('speaking');
+    utterance.onend = () => setStatus('idle');
+    utterance.onerror = () => setStatus('idle');
+
+    setStatus('speaking');
+    window.speechSynthesis.speak(utterance);
+  };
+
+  // Start speech recognition
+  const startListening = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      setError('Speech recognition not supported. Use text input.');
+      return;
+    }
+
+    // Cancel any ongoing speech
+    window.speechSynthesis.cancel();
+    if (recognitionRef.current) {
+      try { recognitionRef.current.abort(); } catch (e) { }
+    }
 
     const recognition = new SpeechRecognition();
     recognition.lang = 'en-IN';
-    recognition.continuous = false; // Single utterance mode
+    recognition.continuous = false;
     recognition.interimResults = true;
 
     recognition.onstart = () => {
       setStatus('listening');
       setError(null);
-      setTranscript('');
+      setCurrentTranscript('');
     };
 
     recognition.onresult = (event) => {
-      let finalTranscript = '';
-      let interimTranscript = '';
-
+      let final = '', interim = '';
       for (let i = event.resultIndex; i < event.results.length; i++) {
-        const result = event.results[i];
-        if (result.isFinal) {
-          finalTranscript += result[0].transcript;
+        if (event.results[i].isFinal) {
+          final += event.results[i][0].transcript;
         } else {
-          interimTranscript += result[0].transcript;
+          interim += event.results[i][0].transcript;
         }
       }
-
-      setTranscript(finalTranscript || interimTranscript);
-
-      if (finalTranscript) {
-        sendMessage(finalTranscript.trim());
+      setCurrentTranscript(final || interim);
+      if (final) {
+        sendMessage(final.trim());
       }
     };
 
     recognition.onerror = (event) => {
-      console.error('Recognition error:', event.error);
-      if (event.error !== 'no-speech' && event.error !== 'aborted') {
+      console.error('Speech error:', event.error);
+      if (event.error === 'network') {
+        setError('Voice needs HTTPS. Please use text input below.');
+      } else if (event.error !== 'no-speech' && event.error !== 'aborted') {
         setError(`Voice error: ${event.error}`);
       }
       setStatus('idle');
     };
 
     recognition.onend = () => {
-      if (status === 'listening') {
-        setStatus('idle');
-      }
+      if (status === 'listening') setStatus('idle');
     };
 
     recognitionRef.current = recognition;
-
     try {
       recognition.start();
     } catch (e) {
-      setError('Could not start listening');
-      setStatus('idle');
-    }
-  }, [SpeechRecognition, status]);
-
-  // Send message to backend
-  const sendMessage = async (text) => {
-    if (!text.trim()) return;
-
-    setStatus('processing');
-
-    try {
-      const userId = localStorage.getItem("Email") || "guest";
-      const emotionToSend = faceDetected ? currentEmotion : 'Neutral';
-
-      console.log('Sending message:', text);
-
-      const response = await axiosClient.post('/api/chat', {
-        userId,
-        message: text,
-        sessionId: voiceSessionId,
-        emotion: emotionToSend
-      });
-
-      setMessageCount(prev => prev + 1);
-
-      console.log('Response received:', response.data);
-
-      if (response.data && response.data.response) {
-        speakResponse(response.data.response);
-      } else {
-        throw new Error('Empty response from server');
-      }
-    } catch (err) {
-      console.error("Chat error:", err);
-      setError(err.response?.data?.error || err.message || "Failed to get response");
+      setError('Could not start voice. Use text input.');
       setStatus('idle');
     }
   };
 
-  // Speak the AI response
-  const speakResponse = (text) => {
-    if (!('speechSynthesis' in window)) {
-      setError('Speech synthesis not supported');
-      setStatus('idle');
-      return;
-    }
-
-    // Cancel any existing speech
+  // Stop everything
+  const stopAll = () => {
     window.speechSynthesis.cancel();
-
-    const speech = new SpeechSynthesisUtterance(text);
-    speechRef.current = speech;
-
-    // Get available voices
-    let voices = window.speechSynthesis.getVoices();
-    const englishVoice = voices.find(v => v.lang.includes('en-IN'))
-      || voices.find(v => v.lang.includes('en-US'))
-      || voices.find(v => v.lang.includes('en'))
-      || voices[0];
-
-    if (englishVoice) speech.voice = englishVoice;
-    speech.lang = 'en-IN';
-    speech.rate = 1.0;
-    speech.pitch = 1.0;
-    speech.volume = 1.0;
-
-    // Chrome keep-alive workaround
-    const startKeepAlive = () => {
-      if (keepAliveRef.current) clearInterval(keepAliveRef.current);
-      keepAliveRef.current = setInterval(() => {
-        if (window.speechSynthesis.speaking && !window.speechSynthesis.paused) {
-          window.speechSynthesis.pause();
-          window.speechSynthesis.resume();
-        }
-      }, 10000);
-    };
-
-    const stopKeepAlive = () => {
-      if (keepAliveRef.current) {
-        clearInterval(keepAliveRef.current);
-        keepAliveRef.current = null;
-      }
-    };
-
-    speech.onstart = () => {
-      console.log('Speech started');
-      setStatus('speaking');
-      startKeepAlive();
-    };
-
-    speech.onend = () => {
-      console.log('Speech ended');
-      stopKeepAlive();
-      setStatus('idle');
-      setTranscript('');
-    };
-
-    speech.onerror = (event) => {
-      console.error('Speech error:', event.error);
-      stopKeepAlive();
-      if (event.error !== 'interrupted' && event.error !== 'canceled') {
-        setError(`Speech error: ${event.error}`);
-      }
-      setStatus('idle');
-    };
-
-    setStatus('speaking');
-    window.speechSynthesis.speak(speech);
+    if (recognitionRef.current) {
+      try { recognitionRef.current.abort(); } catch (e) { }
+    }
+    setStatus('idle');
   };
 
-  // Handle mic button click
+  // Handle mic click
   const handleMicClick = () => {
     if (status === 'idle') {
       startListening();
     } else {
-      // Interrupt and stop everything
-      stopEverything();
+      stopAll();
     }
   };
 
-  const getStatusText = () => {
-    switch (status) {
-      case 'listening': return transcript || '🎙️ Listening...';
-      case 'processing': return '⏳ Processing...';
-      case 'speaking': return '🔊 Speaking...';
-      default: return 'Tap to speak';
+  // Handle text submit
+  const handleTextSubmit = () => {
+    if (textInput.trim() && status === 'idle') {
+      sendMessage(textInput.trim());
+      setTextInput('');
     }
   };
 
-  const getMicButtonStyle = () => {
-    if (status === 'listening') return 'bg-red-500 animate-pulse';
-    if (status === 'processing') return 'bg-yellow-500';
-    if (status === 'speaking') return 'bg-green-500';
-    return 'bg-gradient-to-r from-blue-500 to-purple-600';
-  };
+  // Cleanup
+  useEffect(() => {
+    return () => {
+      stopVideo();
+      stopAll();
+    };
+  }, []);
 
   return (
-    <div className={`min-h-screen flex flex-col items-center justify-center ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}>
+    <div className={`min-h-screen flex ${isDarkMode ? 'bg-gradient-to-br from-gray-900 via-purple-900/20 to-gray-900' : 'bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50'}`}>
 
-      {/* Main content - side by side */}
-      <div className="flex flex-row items-center justify-center gap-12 mb-8">
-
-        {/* LEFT: User Camera */}
-        <div className="flex flex-col items-center gap-3">
-          <div className={`rounded-2xl overflow-hidden shadow-xl ${isDarkMode ? "bg-gray-800" : "bg-white"}`}>
-            <div className="relative w-80 h-60">
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                muted
-                className={`w-full h-full object-cover ${isVideoEnabled ? 'block' : 'hidden'}`}
-                style={{ transform: 'scaleX(-1)' }}
-              />
-
-              {!isVideoEnabled && (
-                <div className="w-full h-full flex flex-col items-center justify-center gap-2">
-                  <FiVideoOff size={40} className={isDarkMode ? "text-gray-600" : "text-gray-400"} />
-                  <p className={`text-sm ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>Camera off</p>
-                </div>
-              )}
-
-              {isVideoEnabled && (
-                <div className={`absolute bottom-2 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-sm font-medium ${isDarkMode ? 'bg-gray-900/80 text-white' : 'bg-white/80 text-gray-900'}`}>
-                  {currentEmotion} {faceDetected && '●'}
-                </div>
-              )}
-            </div>
+      {/* Left Panel - Camera & Controls */}
+      <div className="w-80 flex flex-col items-center p-6 border-r border-gray-500/20">
+        {/* Camera */}
+        <div className={`rounded-2xl overflow-hidden shadow-xl ${isDarkMode ? 'bg-gray-800' : 'bg-white'} mb-4`}>
+          <div className="relative w-64 h-48">
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className={`w-full h-full object-cover ${isVideoOn ? '' : 'hidden'}`}
+              style={{ transform: 'scaleX(-1)' }}
+            />
+            {!isVideoOn && (
+              <div className="w-full h-full flex flex-col items-center justify-center">
+                <FiVideoOff size={36} className={isDarkMode ? 'text-gray-600' : 'text-gray-400'} />
+                <p className={`text-sm mt-2 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Camera off</p>
+              </div>
+            )}
+            {isVideoOn && (
+              <div className={`absolute bottom-2 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-xs font-medium ${isDarkMode ? 'bg-gray-900/80 text-white' : 'bg-white/90 text-gray-800'}`}>
+                {hasFace ? `😊 ${emotion}` : '👤 No face detected'}
+              </div>
+            )}
           </div>
-
-          {/* Camera toggle */}
-          <button
-            onClick={() => isVideoEnabled ? stopVideo() : startVideo()}
-            className={`px-4 py-2 rounded-xl font-medium flex items-center gap-2 transition-all ${isVideoEnabled
-              ? 'bg-green-500 text-white'
-              : isDarkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-700'
-              }`}
-          >
-            {isVideoEnabled ? <FiVideo size={18} /> : <FiVideoOff size={18} />}
-            {isVideoEnabled ? 'Camera On' : 'Enable Camera'}
-          </button>
         </div>
 
-        {/* RIGHT: AI Avatar */}
-        <div className="flex flex-col items-center">
-          <TalkingAvatar
-            isSpeaking={status === 'speaking'}
-            isListening={status === 'listening'}
-            emotion={currentEmotion}
-            size={240}
-          />
-        </div>
-      </div>
+        {/* Camera Toggle */}
+        <button
+          onClick={() => isVideoOn ? stopVideo() : startVideo()}
+          className={`px-4 py-2 rounded-xl font-medium flex items-center gap-2 mb-6 transition-all ${isVideoOn ? 'bg-green-500 text-white' : isDarkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-700'
+            }`}
+        >
+          {isVideoOn ? <FiVideo size={18} /> : <FiVideoOff size={18} />}
+          {isVideoOn ? 'Camera On' : 'Enable Camera'}
+        </button>
 
-      {/* Controls - centered below */}
-      <div className="flex flex-col items-center gap-4">
-        {/* Error */}
-        {error && (
-          <div className="p-3 rounded-xl bg-red-500/10 text-red-500 text-sm text-center max-w-sm">
-            {error}
-          </div>
-        )}
+        {/* Socket Status */}
+        <div className={`text-xs mb-4 ${socketConnected ? 'text-green-500' : 'text-red-500'}`}>
+          {socketConnected ? '● Connected to emotion server' : '○ Connecting...'}
+        </div>
 
         {/* Mic Button */}
         <button
           onClick={handleMicClick}
-          className={`w-20 h-20 rounded-full flex items-center justify-center shadow-xl transition-all transform hover:scale-105 text-white ${getMicButtonStyle()}`}
+          disabled={status === 'processing' || status === 'speaking'}
+          className={`w-20 h-20 rounded-full flex items-center justify-center shadow-xl transition-all text-white ${status === 'listening' ? 'bg-red-500 animate-pulse' :
+              status === 'processing' ? 'bg-yellow-500' :
+                status === 'speaking' ? 'bg-green-500' :
+                  'bg-gradient-to-r from-blue-500 to-purple-600 hover:scale-105'
+            }`}
         >
           {status !== 'idle' ? <RiStopCircleLine size={40} /> : <RiMic2Line size={40} />}
         </button>
 
-        {/* Status text */}
-        <p className={`text-lg font-medium text-center max-w-md ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>
-          {getStatusText()}
+        <p className={`mt-3 text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+          {status === 'listening' ? 'Listening...' :
+            status === 'processing' ? 'Thinking...' :
+              status === 'speaking' ? 'Speaking...' : 'Tap to speak'}
         </p>
 
-        {/* Conversation info & new convo button */}
-        <div className="flex items-center gap-4 mt-2">
-          {messageCount > 0 && (
-            <span className={`text-sm ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
-              {messageCount} message{messageCount !== 1 ? 's' : ''} in this session
-            </span>
+        {currentTranscript && status === 'listening' && (
+          <p className={`mt-2 text-xs italic ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+            "{currentTranscript}"
+          </p>
+        )}
+
+        {error && (
+          <div className="mt-4 p-3 rounded-xl bg-red-500/10 text-red-500 text-xs text-center max-w-full">
+            {error}
+          </div>
+        )}
+
+        {/* Text Input */}
+        <div className="mt-6 w-full">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={textInput}
+              onChange={(e) => setTextInput(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && handleTextSubmit()}
+              placeholder="Type message..."
+              disabled={status !== 'idle'}
+              className={`flex-1 px-3 py-2 rounded-xl text-sm ${isDarkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-800 border-gray-300'
+                } border focus:border-purple-500 outline-none`}
+            />
+            <button
+              onClick={handleTextSubmit}
+              disabled={!textInput.trim() || status !== 'idle'}
+              className={`p-2 rounded-xl ${textInput.trim() && status === 'idle'
+                  ? 'bg-purple-600 text-white'
+                  : isDarkMode ? 'bg-gray-700 text-gray-500' : 'bg-gray-200 text-gray-400'
+                }`}
+            >
+              <RiSendPlane2Fill size={20} />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Center - AI Avatar */}
+      <div className="flex-1 flex flex-col items-center justify-center">
+        <AIAvatar
+          isSpeaking={status === 'speaking'}
+          isListening={status === 'listening'}
+          size={280}
+        />
+      </div>
+
+      {/* Right Panel - Conversation */}
+      <div className={`w-96 flex flex-col p-6 border-l ${isDarkMode ? 'border-gray-700/50' : 'border-gray-200'}`}>
+        <h3 className={`text-lg font-bold mb-4 flex items-center gap-2 ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
+          <FiVolume2 className="text-purple-500" />
+          Conversation
+        </h3>
+
+        <div className="flex-1 overflow-y-auto space-y-2 pr-2" style={{ maxHeight: 'calc(100vh - 150px)' }}>
+          {messages.length === 0 ? (
+            <div className={`text-center py-12 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+              <p className="text-4xl mb-3">💬</p>
+              <p className="text-sm">Start talking to Dr. Aria!</p>
+              <p className="text-xs mt-1">Use the mic or type below</p>
+            </div>
+          ) : (
+            messages.map((msg, i) => (
+              <ChatBubble key={i} text={msg.text} isUser={msg.isUser} isDarkMode={isDarkMode} />
+            ))
           )}
+
+          {status === 'processing' && (
+            <div className="flex justify-start">
+              <div className={`px-4 py-3 rounded-2xl ${isDarkMode ? 'bg-gray-700' : 'bg-white border'}`}>
+                <div className="flex gap-1">
+                  <span className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" />
+                  <span className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
+                  <span className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div ref={messagesEndRef} />
         </div>
       </div>
     </div>

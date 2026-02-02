@@ -283,7 +283,7 @@ def handle_video_frame(data):
     Handle incoming video frame from client.
     Expects data with 'frame' key containing base64-encoded JPEG image.
     """
-    # print("Processing video frame...") # Uncomment for verbose frame logging
+    print("Processing video frame...") # Debug log - enable to verify frames received
     if not deepface_available:
         print("Error: DeepFace not available")
         emit("emotion_update", {"emotion": "Neutral", "error": "DeepFace not loaded"})
@@ -324,7 +324,7 @@ def handle_video_frame(data):
                 if detected_emotion == "Disgust":
                     detected_emotion = "Disgusted"
 
-            # print(f"Detected emotion: {detected_emotion}, Face detected: {face_detected}") # Debug log
+            print(f"Detected emotion: {detected_emotion}, Face detected: {face_detected}") # Debug log
 
         except Exception as e:
             # No face detected or analysis failed - use neutral
