@@ -93,7 +93,7 @@ const Signup = () => {
     navigate("/chatbot");
   };
 
-  // Google Sign
+  // Google Sig
   const handleGoogleSignup = async () => {
     try {
       const result = await signInWithPopup(auth, GoogleProvider);
