@@ -16,7 +16,7 @@ import {
 import { ThemeContext } from "./ThemeContext";
 import { useFitnessData } from "../hooks/useFitnessData";
 
-// Stat Card Component with gradient background
+// Stat Card Component with gradient backgroun
 const StatCard = ({ icon, title, value, unit, subtitle, gradient, isDarkMode }) => (
   <div
     className={`relative overflow-hidden rounded-2xl p-5 shadow-lg transition-all duration-300 hover:scale-105 hover:shadow-xl ${gradient}`}
