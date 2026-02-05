@@ -10,7 +10,7 @@ const FitbitLogin = () => {
   return (
     <div className={`min-h-screen flex flex-col items-center justify-center ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}>
       <div className={`p-8 rounded-2xl shadow-xl max-w-md w-full mx-4 text-center ${isDarkMode ? "bg-gray-800" : "bg-white"}`}>
-        {/* Icon */}
+        {/* Icon  */}
         <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-teal-400 to-blue-500 flex items-center justify-center">
           <span className="text-4xl">⌚</span>
         </div>
