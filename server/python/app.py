@@ -22,7 +22,7 @@ from flask import Flask, request, jsonify, Response
 app = Flask(__name__)
 CORS(app)
 
-# Initialize SocketIO with CORS support
+# Initialize SocketIO with CORS supportt
 # Use threading mode but allow fallback to polling to avoid WebSocket errors with Werkzeug
 socketio = SocketIO(
     app,
