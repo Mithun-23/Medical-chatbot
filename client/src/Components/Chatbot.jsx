@@ -24,6 +24,7 @@ export default function Chatbot() {
   const [messages, setMessages] = useState([]);
   const [currentEmotion, setCurrentEmotion] = useState('Neutral'); // Add emotion state
 
+
   const [showChatHistory, setShowChatHistory] = useState(false);
   const [chatHistory, setChatHistory] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
