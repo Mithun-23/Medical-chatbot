@@ -304,32 +304,47 @@ def handle_video_frame(data):
         detected_emotion = "Neutral"
         face_detected = False
 
-        try:
-            # Use DeepFace to analyze emotion (it handles face detection internally)
-            result = DeepFace.analyze(
-                frame, actions=["emotion"], enforce_detection=False, silent=True
-            )
+        # 1. FAST FACE DETECTION (Haar Cascade)
+        # Load the cascade
+        face_cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
+        face_cascade = cv2.CascadeClassifier(face_cascade_path)
+        
+        # Convert to grayscale for detection
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        boxes = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+        
+        if len(boxes) > 0:
+            face_detected = True
+            
+            # 2. EMOTION ANALYSIS (DeepFace) - Only ran if face detected
+            try:
+                # We can pass the full frame, or the cropped face. Passing full frame to DeepFace is easier but slower.
+                # Let's pass the full frame but hint detection is already done.
+                result = DeepFace.analyze(
+                    frame, 
+                    actions=["emotion"], 
+                    enforce_detection=False, # We already detected it, don't double check strictly
+                    detector_backend="opencv", 
+                    silent=True
+                )
+                
+                if isinstance(result, list) and len(result) > 0:
+                    analysis = result[0]
+                else:
+                    analysis = result
 
-            # DeepFace returns a list if multiple faces, or dict if single face
-            if isinstance(result, list) and len(result) > 0:
-                analysis = result[0]
-            else:
-                analysis = result
-
-            if analysis and "dominant_emotion" in analysis:
-                face_detected = True
-                # Capitalize first letter to match frontend expectations
-                detected_emotion = analysis["dominant_emotion"].capitalize()
-                # Map 'Disgust' to 'Disgusted' for consistency with frontend
-                if detected_emotion == "Disgust":
-                    detected_emotion = "Disgusted"
-
-            print(f"Detected emotion: {detected_emotion}, Face detected: {face_detected}") # Debug log
-
-        except Exception as e:
-            # No face detected or analysis failed - use neutral
-            detected_emotion = "Neutral"
+                if analysis and "dominant_emotion" in analysis:
+                    detected_emotion = analysis["dominant_emotion"].capitalize()
+                    if detected_emotion == "Disgust":
+                        detected_emotion = "Disgusted"
+                        
+            except Exception as e:
+                print(f"DeepFace error: {e}")
+                # Fallback: We have a face, but emotion failed. Keep "Neutral" but face_detected=True
+        
+        else:
             face_detected = False
+            detected_emotion = "Neutral"
 
         # Get client emotion state
         if client_id not in client_emotions:

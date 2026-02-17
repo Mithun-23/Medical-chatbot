@@ -125,8 +125,8 @@ const AIAvatar = ({ isSpeaking, isListening, size = 280 }) => {
 const ChatBubble = ({ text, isUser, isDarkMode }) => (
   <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} w-full mb-3`}>
     <div className={`max-w-xs px-4 py-3 rounded-2xl shadow-lg ${isUser
-        ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-br-sm'
-        : isDarkMode ? 'bg-gray-700 text-gray-100 rounded-bl-sm' : 'bg-white text-gray-800 rounded-bl-sm border border-gray-200'
+      ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-br-sm'
+      : isDarkMode ? 'bg-gray-700 text-gray-100 rounded-bl-sm' : 'bg-white text-gray-800 rounded-bl-sm border border-gray-200'
       }`}>
       <p className="text-sm">{text}</p>
     </div>
@@ -335,7 +335,7 @@ export default function Voice() {
     }
 
     const recognition = new SpeechRecognition();
-    recognition.lang = 'en-IN';
+    recognition.lang = 'en-US'; // Changed from en-IN to en-US for better compatibility
     recognition.continuous = false;
     recognition.interimResults = true;
 
@@ -363,8 +363,13 @@ export default function Voice() {
     recognition.onerror = (event) => {
       console.error('Speech error:', event.error);
       if (event.error === 'network') {
-        setError('Voice needs HTTPS. Please use text input below.');
-      } else if (event.error !== 'no-speech' && event.error !== 'aborted') {
+        setError('Connection error. Please check your internet or try using Chrome.');
+      } else if (event.error === 'not-allowed') {
+        setError('Microphone access denied. Please allow permission.');
+      } else if (event.error === 'no-speech') {
+        // Ignore no-speech errors (common when silence)
+        return;
+      } else if (event.error !== 'aborted') {
         setError(`Voice error: ${event.error}`);
       }
       setStatus('idle');
@@ -467,9 +472,9 @@ export default function Voice() {
           onClick={handleMicClick}
           disabled={status === 'processing' || status === 'speaking'}
           className={`w-20 h-20 rounded-full flex items-center justify-center shadow-xl transition-all text-white ${status === 'listening' ? 'bg-red-500 animate-pulse' :
-              status === 'processing' ? 'bg-yellow-500' :
-                status === 'speaking' ? 'bg-green-500' :
-                  'bg-gradient-to-r from-blue-500 to-purple-600 hover:scale-105'
+            status === 'processing' ? 'bg-yellow-500' :
+              status === 'speaking' ? 'bg-green-500' :
+                'bg-gradient-to-r from-blue-500 to-purple-600 hover:scale-105'
             }`}
         >
           {status !== 'idle' ? <RiStopCircleLine size={40} /> : <RiMic2Line size={40} />}
@@ -510,8 +515,8 @@ export default function Voice() {
               onClick={handleTextSubmit}
               disabled={!textInput.trim() || status !== 'idle'}
               className={`p-2 rounded-xl ${textInput.trim() && status === 'idle'
-                  ? 'bg-purple-600 text-white'
-                  : isDarkMode ? 'bg-gray-700 text-gray-500' : 'bg-gray-200 text-gray-400'
+                ? 'bg-purple-600 text-white'
+                : isDarkMode ? 'bg-gray-700 text-gray-500' : 'bg-gray-200 text-gray-400'
                 }`}
             >
               <RiSendPlane2Fill size={20} />

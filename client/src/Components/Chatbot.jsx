@@ -329,7 +329,7 @@ export default function Chatbot() {
           />
         </div>
 
-        {/* Clear Chat Button + Chat Input */}
+        {/* Clear Chat Button + Chat Inpu */}
         <div className="relative">
           {messages.length > 0 && (
             <div className={`flex justify-center py-2 ${isDarkMode ? 'bg-gray-800' : 'bg-gray-50'}`}>
